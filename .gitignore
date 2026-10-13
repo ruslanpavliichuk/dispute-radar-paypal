@@ -1,0 +1,26 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Agent tooling (project-local installs from pstack's skills CLI)
+.agents/
+.claude/
+skills-lock.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+mlruns/
+ml/data/raw/
+
+# Node / Next.js
+node_modules/
+.next/
+
+# OS / editor
+.DS_Store
+.idea/
