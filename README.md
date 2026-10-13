@@ -2,8 +2,6 @@
 
 Predicts which PayPal orders will turn into disputes and acts before the buyer files one. Calibrated LightGBM models with SHAP explanations, and an evidence-backed response when a dispute still arrives. Built for the PayPal AI Hackathon 2026.
 
-Full project context, architecture and task plan: [CONTEXT.md](./CONTEXT.md). Live task checklist: [TASKS.md](./TASKS.md).
-
 **Status:** early build (T01 in progress). This README covers setup for what exists today; a full run guide lands at T18.
 
 ## Setup
