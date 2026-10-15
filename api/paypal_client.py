@@ -1,12 +1,22 @@
 import json
 import logging
 import time
+from urllib.parse import urlparse
 
 import httpx
 
 from api.config import settings
 
 logger = logging.getLogger("dispute_radar.paypal")
+
+SIGNATURE_HEADERS = (
+    "paypal-auth-algo",
+    "paypal-cert-url",
+    "paypal-transmission-id",
+    "paypal-transmission-sig",
+    "paypal-transmission-time",
+)
+CERT_HOSTS = {"api.paypal.com", "api.sandbox.paypal.com", "api-m.paypal.com", "api-m.sandbox.paypal.com"}
 
 
 class PayPalClient:
@@ -39,30 +49,59 @@ class PayPalClient:
         return self._token
 
     async def request(self, method: str, path: str, **kwargs) -> httpx.Response:
-        token = await self._get_token()
-        headers = kwargs.pop("headers", {})
-        headers["Authorization"] = f"Bearer {token}"
-        return await self._client.request(method, path, headers=headers, **kwargs)
+        # one retry: PayPal can revoke a token before our cached expiry
+        for attempt in (1, 2):
+            token = await self._get_token()
+            headers = {**kwargs.get("headers", {}), "Authorization": f"Bearer {token}"}
+            response = await self._client.request(method, path, **{**kwargs, "headers": headers})
+            if response.status_code != 401 or attempt == 2:
+                return response
+            self._token = None
+        return response
 
     async def verify_webhook_signature(
         self, headers: dict, body: str, webhook_id: str
     ) -> bool:
-        payload = {
-            "auth_algo": headers.get("paypal-auth-algo"),
-            "cert_url": headers.get("paypal-cert-url"),
-            "transmission_id": headers.get("paypal-transmission-id"),
-            "transmission_sig": headers.get("paypal-transmission-sig"),
-            "transmission_time": headers.get("paypal-transmission-time"),
-            "webhook_id": webhook_id,
-            "webhook_event": json.loads(body),
-        }
-        response = await self.request(
-            "POST", "/v1/notifications/verify-webhook-signature", json=payload
-        )
-        if not response.is_success:
-            # PayPal answers 400 for events it can't verify, e.g. simulator mock events
-            logger.warning("verify-webhook-signature %s: %s", response.status_code, response.text)
+        """True only when PayPal confirms the signature.
+
+        False for anything that can't be a valid delivery (missing or untrusted
+        signature headers, PayPal's 400, FAILURE). Raises httpx.HTTPError when PayPal
+        itself can't answer (5xx, 401 after retry, timeout), so the caller can ask
+        PayPal to retry instead of reporting a bad signature.
+        """
+        values = {name: headers.get(name) for name in SIGNATURE_HEADERS}
+        if not all(values.values()):
             return False
+        cert = urlparse(values["paypal-cert-url"])
+        # netloc, not hostname: rejects userinfo, ports and backslash tricks outright
+        if cert.scheme != "https" or cert.netloc not in CERT_HOSTS:
+            return False
+        if values["paypal-auth-algo"] != "SHA256withRSA":
+            return False
+
+        fields = json.dumps(
+            {
+                "auth_algo": values["paypal-auth-algo"],
+                "cert_url": values["paypal-cert-url"],
+                "transmission_id": values["paypal-transmission-id"],
+                "transmission_sig": values["paypal-transmission-sig"],
+                "transmission_time": values["paypal-transmission-time"],
+                "webhook_id": webhook_id,
+            }
+        )
+        # splice the raw body in so PayPal sees the exact bytes it signed
+        content = f'{fields[:-1]}, "webhook_event": {body}}}'
+        response = await self.request(
+            "POST",
+            "/v1/notifications/verify-webhook-signature",
+            content=content,
+            headers={"Content-Type": "application/json"},
+        )
+        if response.status_code == 400:
+            # PayPal answers 400 for events it can't verify, e.g. simulator mock events
+            logger.warning("verify-webhook-signature 400: %.200r", response.text)
+            return False
+        response.raise_for_status()
         return response.json().get("verification_status") == "SUCCESS"
 
     async def list_disputes(self, page_size: int = 5) -> dict:
