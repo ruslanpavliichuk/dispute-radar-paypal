@@ -1,4 +1,8 @@
+from urllib.parse import urlparse
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+SANDBOX_HOSTS = {"api-m.sandbox.paypal.com", "api.sandbox.paypal.com"}
 
 
 class Settings(BaseSettings):
@@ -27,5 +31,5 @@ def require_settings() -> None:
     ]
     if missing:
         raise RuntimeError(f"Missing required settings in .env: {', '.join(missing)}")
-    if "sandbox" not in settings.paypal_api_base:
-        raise RuntimeError("PAYPAL_API_BASE must be a sandbox URL; this project is sandbox-only")
+    if urlparse(settings.paypal_api_base).hostname not in SANDBOX_HOSTS:
+        raise RuntimeError("PAYPAL_API_BASE must be a PayPal sandbox host; this project is sandbox-only")

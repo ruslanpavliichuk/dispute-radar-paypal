@@ -4,8 +4,11 @@ import httpx
 import pytest
 import respx
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 from api.config import settings
+from api.db import webhook_events
 from api.main import app
 from api.webhooks import MAX_BODY_BYTES
 
@@ -110,6 +113,89 @@ def test_unconfigured_webhook_id_is_503_not_invalid_signature(paypal, monkeypatc
 def test_paypal_outage_is_503_so_paypal_retries(paypal, effect):
     paypal.verify_route.mock(side_effect=[effect])
     assert post().status_code == 503
+
+
+DISPUTE_EVENT = {
+    "id": "WH-EVT-9",
+    "event_type": "CUSTOMER.DISPUTE.CREATED",
+    "resource": {"dispute_id": "PP-R-1", "buyer_email": "buyer@example.com"},
+}
+
+
+def stored_events():
+    with app.state.engine.connect() as conn:
+        return conn.execute(select(webhook_events)).mappings().all()
+
+
+def test_verified_event_is_persisted_without_its_body(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+
+    with TestClient(app) as client:
+        response = client.post(URL, content=json.dumps(DISPUTE_EVENT), headers=HEADERS)
+        rows = stored_events()
+
+    assert response.status_code == 200
+    assert len(rows) == 1
+    assert (rows[0]["event_id"], rows[0]["event_type"], rows[0]["resource_id"]) == (
+        "WH-EVT-9", "CUSTOMER.DISPUTE.CREATED", "PP-R-1",
+    )
+    assert "buyer@example.com" not in str(dict(rows[0]))
+
+
+def test_unverified_event_is_not_persisted(paypal):
+    paypal.verify_route.mock(return_value=httpx.Response(200, json={"verification_status": "FAILURE"}))
+
+    with TestClient(app) as client:
+        response = client.post(URL, content=json.dumps(DISPUTE_EVENT), headers=HEADERS)
+        rows = stored_events()
+
+    assert response.status_code == 400
+    assert rows == []
+
+
+def test_redelivered_event_is_a_noop(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+
+    with TestClient(app) as client:
+        first = client.post(URL, content=json.dumps(DISPUTE_EVENT), headers=HEADERS)
+        second = client.post(URL, content=json.dumps(DISPUTE_EVENT), headers=HEADERS)
+        rows = stored_events()
+
+    assert first.json() == {"status": "received"}
+    assert second.status_code == 200 and second.json() == {"status": "duplicate"}
+    assert len(rows) == 1
+
+
+def test_event_without_type_is_stored_as_unknown_and_long_id_is_rejected(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+
+    with TestClient(app) as client:
+        ok = client.post(URL, content=json.dumps({"id": "WH-NO-TYPE"}), headers=HEADERS)
+        too_long = client.post(URL, content=json.dumps({"id": "x" * 101}), headers=HEADERS)
+        rows = stored_events()
+
+    assert ok.status_code == 200 and too_long.status_code == 400
+    assert [(r["event_id"], r["event_type"]) for r in rows] == [("WH-NO-TYPE", "UNKNOWN")]
+
+
+def test_database_error_while_recording_is_503_so_paypal_redelivers(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+
+    class BrokenEngine:
+        def __init__(self, real):
+            self.real = real
+
+        def begin(self):
+            raise OperationalError("INSERT", {}, Exception("db down"))
+
+        def dispose(self):
+            self.real.dispose()
+
+    with TestClient(app) as client:
+        app.state.engine = BrokenEngine(app.state.engine)
+        response = client.post(URL, content=json.dumps(DISPUTE_EVENT), headers=HEADERS)
+
+    assert response.status_code == 503
 
 
 def test_startup_fails_without_client_credentials(monkeypatch):
