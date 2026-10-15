@@ -21,11 +21,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Simulator mock event reaches `/api/webhooks/paypal` and is rejected cleanly (400); PayPal can't postback-verify mock events
   - Done when: `make dev` starts the API and a test webhook from the PayPal dashboard verifies
   - Note: a real `SUCCESS` verification needs a real signed event; it is exercised in T03 (real dispute)
-- [ ] **T02** Demo shop (2h)
-  - [ ] Next.js page, 6–10 products from Channel3
-  - [ ] PayPal JS SDK checkout
-  - [ ] Server-side create + capture with the Server SDK
-  - [ ] Orders saved to Postgres
+- [~] **T02** Demo shop (2h, two sessions)
+  - [x] Session 1 backend: Postgres via `docker-compose.yml`, `orders` table, catalogue (8 hand-written UK products), `GET /api/shop/products`, `POST /api/shop/orders`, `POST /api/shop/orders/{id}/capture` with amount/currency verification and request-id idempotency, 63 tests
+  - [x] Reviewed by Reviewer + Security agents; findings fixed (sparse SDK responses, terminal states, race, timeouts, lifespan, localhost-only DB port, sandbox-only API base)
+  - [ ] **You:** start Docker Desktop, `make db`, put `DATABASE_URL` (see `.env.example`) in `.env`, optionally `CHANNEL3_API_KEY` then `make catalogue`
+  - [ ] Verify the backend against real Postgres (`make dev`, create + capture through the API)
+  - [ ] Session 2: `web/` Next.js page, `@paypal/react-paypal-js` button (GBP, capture), `/api/shop/*` rewrite, end-to-end with the sandbox Personal buyer
   - Done when: a sandbox buyer completes a purchase and the order row appears with its capture ID
 - [ ] **T03** Sandbox dispute script (2h)
   - [ ] `scripts/simulate_dispute.py`
@@ -73,9 +74,10 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [ ] Claude draft (cites only backend-passed evidence), decision layer, store proposal
   - [ ] On approval: `provide-evidence` / `make-offer` / `send-message` / `accept-claim`
   - [ ] Webhook replay protection: dedupe on event `id` and check `paypal-transmission-time` skew before any action (deferred from T01 review, finding J)
-  - [ ] Rate-limit the public webhook endpoint at the proxy (deferred from T01 review, finding L3)
+  - [ ] Rate-limit the public webhook and `POST /api/shop/orders` at the proxy; purge stale `CREATED` orders (deferred from T01/T02 reviews)
   - Done when: a sandbox dispute gets a proposal and an approved proposal reaches PayPal
 - [ ] **T12** Prevention agent (2h)
+  - [ ] Reconcile `PENDING` orders (webhook `PAYMENT.CAPTURE.COMPLETED` or `get_order`) and alert on `MISMATCH`/`UNKNOWN` orders; refunds (deferred from T02 review)
   - [ ] `scripts/simulate_tracking.py` (accepted, in transit, stuck at depot, out for delivery, delivered)
   - [ ] Worker re-scores on each event, proposes tracking upload / buyer email / goodwill refund at threshold
   - [ ] On approval: tracking or refund REST call via `httpx`
@@ -95,6 +97,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ## Week 4 — Ship (Oct 31–Nov 6, 10h)
 
 - [ ] **T16** Render deploy (2h)
+  - [ ] Before real users: per-order secret returned by create and required on capture, `sslmode=require` on the managed DB, no permissive CORS (deferred from T02 review)
   - [ ] `render.yaml`: web, api, worker, Postgres
   - [ ] Register production webhook URL, seed data for first-time visitor
   - Done when: hosted URL runs the full demo

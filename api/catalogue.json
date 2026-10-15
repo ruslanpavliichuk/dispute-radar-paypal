@@ -1,0 +1,10 @@
+[
+  {"id": "wool-beanie", "title": "Merino wool beanie", "brand": "Northfield", "image_url": null, "price_minor": 1800, "currency": "GBP"},
+  {"id": "ceramic-mug", "title": "Hand-glazed ceramic mug", "brand": "Kiln & Co", "image_url": null, "price_minor": 1450, "currency": "GBP"},
+  {"id": "canvas-tote", "title": "Waxed canvas tote bag", "brand": "Harbour Goods", "image_url": null, "price_minor": 3200, "currency": "GBP"},
+  {"id": "desk-lamp", "title": "Brass adjustable desk lamp", "brand": "Lumen Works", "image_url": null, "price_minor": 5900, "currency": "GBP"},
+  {"id": "leather-wallet", "title": "Slim leather card wallet", "brand": "Tanner Street", "image_url": null, "price_minor": 2400, "currency": "GBP"},
+  {"id": "linen-throw", "title": "Stonewashed linen throw", "brand": "Fold & Weave", "image_url": null, "price_minor": 4500, "currency": "GBP"},
+  {"id": "cast-skillet", "title": "Seasoned cast iron skillet", "brand": "Ironmonger", "image_url": null, "price_minor": 3800, "currency": "GBP"},
+  {"id": "soy-candle", "title": "Soy wax candle, cedar and fig", "brand": "Wick & Wander", "image_url": null, "price_minor": 1650, "currency": "GBP"}
+]
