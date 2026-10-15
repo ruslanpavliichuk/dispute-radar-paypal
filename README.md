@@ -49,10 +49,34 @@ PayPal can't reach `localhost`, so expose the dev server with a tunnel:
 cloudflared tunnel --url http://localhost:8000
 ```
 
-Then, in the PayPal Developer Dashboard, on your sandbox app:
-1. Add a webhook pointing at `https://<your-tunnel-subdomain>.trycloudflare.com/api/webhooks/paypal`.
-2. Subscribe to at least `CUSTOMER.DISPUTE.CREATED`.
-3. Copy the webhook's ID into `.env` as `PAYPAL_WEBHOOK_ID`.
-4. Use the dashboard's "Send test webhook" button — the request should return `200 {"status": "received"}` and show up in `make dev`'s logs.
+Then, in the PayPal Developer Dashboard, open your sandbox **app** (Apps & Credentials → your app → Webhooks, *not* the Webhooks Simulator):
+1. Add a webhook pointing at `https://<your-tunnel-subdomain>.trycloudflare.com/api/webhooks/paypal`. Delete any webhook that points at an old tunnel.
+2. Subscribe it to `CUSTOMER.DISPUTE.CREATED`, `CUSTOMER.DISPUTE.UPDATED` and `CUSTOMER.DISPUTE.RESOLVED`.
+3. Copy the webhook's ID into `.env` as `PAYPAL_WEBHOOK_ID`, then **restart `make dev`** (`--reload` does not re-read `.env`).
 
 The cloudflared quick-tunnel URL changes every time you restart it, so you'll need to update the webhook URL in the dashboard after each restart.
+
+> The Webhooks Simulator sends mock events that PayPal cannot verify, so they are rejected with `400`. Use a real dispute (below) to see a verified event.
+
+## Simulating a dispute (sandbox)
+
+Disputes can't be created through the API, so the buyer files one by hand and `scripts/simulate_dispute.py` moves it along. Sandbox only: the script refuses a non-sandbox `PAYPAL_API_BASE`, refuses disputes that aren't for one of our `orders`, and always needs an explicit dispute id.
+
+1. Make a purchase in the demo shop with your sandbox **Personal** account; confirm the order is `COMPLETED` in `orders`.
+2. Log in at <https://www.sandbox.paypal.com> as that buyer, open the payment, choose **Report a problem**, and pick "item not received".
+3. A `CUSTOMER.DISPUTE.CREATED` delivery should arrive. Check it was verified and recorded:
+   ```bash
+   docker compose exec db psql -U dispute -d dispute_radar -c \
+     "select event_type, resource_id, received_at from webhook_events order by received_at;"
+   ```
+4. Find the dispute, see what PayPal currently allows, and escalate it:
+   ```bash
+   uv run python -m scripts.simulate_dispute list
+   uv run python -m scripts.simulate_dispute show <DISPUTE_ID>      # prints "actions PayPal allows now"
+   uv run python -m scripts.simulate_dispute escalate <DISPUTE_ID>  # INQUIRY -> claim, status UNDER_REVIEW
+   ```
+5. Re-run the `select` above: you should see `CREATED` and several `UPDATED` events, each verified and stored once.
+
+`evidence` (require-evidence) and `adjudicate` are in the script too, but PayPal only accepts them when the dispute's own links include them. **In practice the sandbox does not offer those links on disputes filed through the Resolution Center**, so both return `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE`. The script prints that reason and exits 1. The sandbox create-dispute API is limited-release and its request body is not public.
+
+`webhook_events` stores only the event id, type, resource id and time (never the body, which holds the buyer's email and messages). A redelivered event id is ignored.
