@@ -24,6 +24,23 @@ make test   # pytest
 
 `GET /health` confirms the API is up.
 
+## Demo shop (sandbox)
+
+Needs Docker (for Postgres) and Node 20+.
+
+```bash
+make db                                  # Postgres 16 on 127.0.0.1:5432
+cp web/.env.local.example web/.env.local # set NEXT_PUBLIC_PAYPAL_CLIENT_ID (public sandbox client ID)
+cd web && npm install && cd ..
+make dev                                 # API on :8000
+make web                                 # shop on http://localhost:3000
+```
+
+In `.env` also set `DATABASE_URL` (see `.env.example`). Buy with a **sandbox Personal** account; the order appears in the `orders` table with its capture ID.
+
+- Prices come from `api/catalogue.json`, never from the browser. `make catalogue` refreshes it from Channel3 (needs `CHANNEL3_API_KEY`); the shop itself never calls Channel3.
+- Channel3 prices are in USD and are **relabelled as GBP at face value** for the demo (no FX conversion).
+
 ## Testing the webhook locally
 
 PayPal can't reach `localhost`, so expose the dev server with a tunnel:

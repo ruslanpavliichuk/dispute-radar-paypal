@@ -21,12 +21,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Simulator mock event reaches `/api/webhooks/paypal` and is rejected cleanly (400); PayPal can't postback-verify mock events
   - Done when: `make dev` starts the API and a test webhook from the PayPal dashboard verifies
   - Note: a real `SUCCESS` verification needs a real signed event; it is exercised in T03 (real dispute)
-- [~] **T02** Demo shop (2h, two sessions)
-  - [x] Session 1 backend: Postgres via `docker-compose.yml`, `orders` table, catalogue (8 hand-written UK products), `GET /api/shop/products`, `POST /api/shop/orders`, `POST /api/shop/orders/{id}/capture` with amount/currency verification and request-id idempotency, 63 tests
-  - [x] Reviewed by Reviewer + Security agents; findings fixed (sparse SDK responses, terminal states, race, timeouts, lifespan, localhost-only DB port, sandbox-only API base)
-  - [ ] **You:** start Docker Desktop, `make db`, put `DATABASE_URL` (see `.env.example`) in `.env`, optionally `CHANNEL3_API_KEY` then `make catalogue`
-  - [ ] Verify the backend against real Postgres (`make dev`, create + capture through the API)
-  - [ ] Session 2: `web/` Next.js page, `@paypal/react-paypal-js` button (GBP, capture), `/api/shop/*` rewrite, end-to-end with the sandbox Personal buyer
+- [x] **T02** Demo shop (2h, two sessions)
+  - [x] Backend: Postgres via `docker-compose.yml`, `orders` table, Channel3 catalogue snapshot (8 products, price cap), `GET /api/shop/products`, `POST /api/shop/orders`, `POST /api/shop/orders/{id}/capture` with server-side pricing, amount/currency verification and request-id idempotency, 63 tests
+  - [x] Backend reviewed by Reviewer + Security agents; findings fixed
+  - [x] Frontend: `web/` Next.js 16 page, `@paypal/react-paypal-js` v10 (PayPal V6 SDK) button per product, `/api/shop/*` same-origin rewrite
+  - [x] Verified live: sandbox buyer purchase, green notice, `COMPLETED` row with `capture_id`, `payer_id` and timestamp in Postgres
   - Done when: a sandbox buyer completes a purchase and the order row appears with its capture ID
 - [ ] **T03** Sandbox dispute script (2h)
   - [ ] `scripts/simulate_dispute.py`

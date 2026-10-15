@@ -1,10 +1,66 @@
 [
-  {"id": "wool-beanie", "title": "Merino wool beanie", "brand": "Northfield", "image_url": null, "price_minor": 1800, "currency": "GBP"},
-  {"id": "ceramic-mug", "title": "Hand-glazed ceramic mug", "brand": "Kiln & Co", "image_url": null, "price_minor": 1450, "currency": "GBP"},
-  {"id": "canvas-tote", "title": "Waxed canvas tote bag", "brand": "Harbour Goods", "image_url": null, "price_minor": 3200, "currency": "GBP"},
-  {"id": "desk-lamp", "title": "Brass adjustable desk lamp", "brand": "Lumen Works", "image_url": null, "price_minor": 5900, "currency": "GBP"},
-  {"id": "leather-wallet", "title": "Slim leather card wallet", "brand": "Tanner Street", "image_url": null, "price_minor": 2400, "currency": "GBP"},
-  {"id": "linen-throw", "title": "Stonewashed linen throw", "brand": "Fold & Weave", "image_url": null, "price_minor": 4500, "currency": "GBP"},
-  {"id": "cast-skillet", "title": "Seasoned cast iron skillet", "brand": "Ironmonger", "image_url": null, "price_minor": 3800, "currency": "GBP"},
-  {"id": "soy-candle", "title": "Soy wax candle, cedar and fig", "brand": "Wick & Wander", "image_url": null, "price_minor": 1650, "currency": "GBP"}
+  {
+    "id": "zulay-kitchen-premium-milk-ztmnkm1",
+    "title": "Zulay Kitchen Premium Milk Frother Set",
+    "brand": "Kohl's",
+    "image_url": "https://cdn.trychannel3.com/22d54b3c-da1c-4793-82f9-ad6b40fedf15?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=OtP4",
+    "price_minor": 1999,
+    "currency": "GBP"
+  },
+  {
+    "id": "lush-kitchen-fjluq9a",
+    "title": "Lush Kitchen",
+    "brand": "Lush Cosmetics",
+    "image_url": "https://cdn.trychannel3.com/75f60486-8f78-40d4-b8b8-d8b3d3e5249f?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=ZBpg",
+    "price_minor": 6300,
+    "currency": "GBP"
+  },
+  {
+    "id": "gift-set-5kbsep3",
+    "title": "Gift Set",
+    "brand": "LEVO Oil Infusion, Inc.",
+    "image_url": "https://cdn.trychannel3.com/5kbSEp3?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=l4ZL",
+    "price_minor": 9565,
+    "currency": "GBP"
+  },
+  {
+    "id": "betty-crocker-3-piece-wvxbv5b",
+    "title": "Betty Crocker 3-Piece Kitchen Appliances Set",
+    "brand": "Betty Crocker",
+    "image_url": "https://cdn.trychannel3.com/22016985-008f-414a-b280-01169ab5e81d?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=7Nxp",
+    "price_minor": 6999,
+    "currency": "GBP"
+  },
+  {
+    "id": "best-gifts-kitchen-towel-xzygpfy",
+    "title": "Best Gifts Kitchen Towel",
+    "brand": "By Kathy",
+    "image_url": "https://cdn.trychannel3.com/5ffec94f-896d-4f80-b381-c25410e05462?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=K6RA",
+    "price_minor": 1960,
+    "currency": "GBP"
+  },
+  {
+    "id": "grateful-floral-anti-fatigue-lbrhhjv",
+    "title": "Grateful Floral Anti-Fatigue Kitchen Mat",
+    "brand": "InHome",
+    "image_url": "https://cdn.trychannel3.com/bc904c36-3379-4606-96fb-ad22e8322ab3?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=Z87s",
+    "price_minor": 4589,
+    "currency": "GBP"
+  },
+  {
+    "id": "victorian-kitchen-1000-piece-u7e4u14",
+    "title": "Victorian Kitchen 1000-Piece Puzzle Cozy 19th-Century Baking Scene Jigsaw",
+    "brand": "eeBoo",
+    "image_url": "https://cdn.trychannel3.com/98efb482-e989-4ec4-8971-d430fc1535db?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=7Nxp",
+    "price_minor": 2499,
+    "currency": "GBP"
+  },
+  {
+    "id": "the-kitchen-trio-2spliob",
+    "title": "The Kitchen Trio",
+    "brand": "Homecourt",
+    "image_url": "https://cdn.trychannel3.com/192a3066-d575-4ac0-94d2-82bb802d7fcd?aid=01M4ZXJ6PXH14J5WPEB1DCQ79B&mid=jSLZ",
+    "price_minor": 8000,
+    "currency": "GBP"
+  }
 ]

@@ -12,7 +12,15 @@ from api.db import orders
 from api.main import app
 from api.shop import CATALOGUE, money
 
-PRODUCT = "wool-beanie"  # 1800 pence in catalogue.json
+PRODUCT = "wool-beanie"
+# Fixed test catalogue: api/catalogue.json is a refreshable Channel3 snapshot
+TEST_CATALOGUE = {
+    PRODUCT: {
+        "id": PRODUCT, "title": "Merino wool beanie", "brand": "Northfield",
+        "image_url": None, "price_minor": 1800, "currency": "GBP",
+    }
+}
+REAL_CATALOGUE = CATALOGUE
 
 
 def paypal_order(
@@ -90,6 +98,7 @@ class WriteFailingEngine:
 def shop(monkeypatch):
     monkeypatch.setattr(settings, "paypal_client_id", "client-id")
     monkeypatch.setattr(settings, "paypal_client_secret", "client-secret")
+    monkeypatch.setattr("api.shop.CATALOGUE", TEST_CATALOGUE)
     fake = FakeOrders()
     with TestClient(app) as client:
         app.state.orders_api = fake
@@ -118,9 +127,13 @@ def test_money_formats_pence_without_floats(minor, expected):
     assert money(minor) == expected
 
 
-def test_catalogue_is_valid():
-    assert 6 <= len(CATALOGUE) <= 10
-    assert all(p["price_minor"] > 0 and p["currency"] == "GBP" for p in CATALOGUE.values())
+def test_committed_catalogue_is_valid():
+    products = list(REAL_CATALOGUE.values())
+    assert 6 <= len(products) <= 10
+    assert len(REAL_CATALOGUE) == len(products)  # ids are unique
+    for p in products:
+        assert p["id"] and p["title"] and p["currency"] == "GBP"
+        assert 0 < p["price_minor"] <= 20000, p["title"]  # a demo item, not a £1,849 table
 
 
 def test_products_are_listed_with_decimal_prices(shop):

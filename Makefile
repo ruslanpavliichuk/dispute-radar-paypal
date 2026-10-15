@@ -1,4 +1,4 @@
-.PHONY: setup dev test train db catalogue
+.PHONY: setup dev test train db catalogue web
 
 db:
 	docker compose up -d db
@@ -17,3 +17,6 @@ test:
 
 train:
 	@echo "No ML artefacts to train yet (lands in T04-T09)."
+
+web:
+	cd web && npm run dev

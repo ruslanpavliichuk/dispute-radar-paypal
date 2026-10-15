@@ -14,6 +14,7 @@ from api.config import settings
 OUT = Path(__file__).resolve().parent.parent / "api" / "catalogue.json"
 QUERY = "gifts for the home and kitchen"
 COUNT = 8
+MAX_PRICE_MINOR = 15000  # keep the demo to sensible gift prices (GBP 150)
 
 
 def slug(text: str) -> str:
@@ -28,7 +29,7 @@ def main() -> None:
     items = []
     for product in client.products.search(query=QUERY, limit=COUNT * 3):
         offer = next((o for o in product.offers or [] if o.price and o.price.price), None)
-        if offer is None:
+        if offer is None or not 0 < float(offer.price.price) * 100 <= MAX_PRICE_MINOR:
             continue
         image = next(
             (i.url for i in product.images or [] if i.is_main_image), None
