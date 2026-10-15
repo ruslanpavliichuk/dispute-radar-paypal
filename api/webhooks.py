@@ -1,10 +1,15 @@
 import json
 import logging
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from sqlalchemy import insert
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
 
 from api.config import settings
+from api.db import webhook_events
 from api.paypal_client import PayPalClient
 
 logger = logging.getLogger("dispute_radar.webhooks")
@@ -16,6 +21,26 @@ router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 def get_paypal_client(request: Request) -> PayPalClient:
     return request.app.state.paypal_client
+
+
+def _store_event(engine, event: dict) -> bool:
+    """Record one verified event. False when this event id was already recorded."""
+    resource = event.get("resource")
+    resource = resource if isinstance(resource, dict) else {}
+    resource_id = resource.get("dispute_id") or resource.get("id")
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                insert(webhook_events).values(
+                    event_id=event["id"],
+                    event_type=event["event_type"][:100],
+                    resource_id=str(resource_id)[:100] if resource_id else None,
+                    received_at=datetime.now(timezone.utc),
+                )
+            )
+    except IntegrityError:
+        return False
+    return True
 
 
 @router.post("/paypal")
@@ -52,5 +77,21 @@ async def paypal_webhook(request: Request):
     if not verified:
         raise HTTPException(status_code=400, detail="invalid webhook signature")
 
-    logger.info("verified webhook event_type=%s id=%s", event.get("event_type"), event.get("id"))
+    event_id = event.get("id")
+    # validated up front so the primary key is the only thing _store_event can collide on
+    if not isinstance(event_id, str) or not 0 < len(event_id) <= 100:
+        raise HTTPException(status_code=400, detail="event has no usable id")
+    if not isinstance(event.get("event_type"), str):
+        event["event_type"] = "UNKNOWN"
+    try:
+        stored = await run_in_threadpool(_store_event, request.app.state.engine, event)
+    except SQLAlchemyError:
+        # 503 so PayPal redelivers once the database is back
+        logger.exception("could not store webhook event %r", event_id)
+        raise HTTPException(status_code=503, detail="could not record event") from None
+    if not stored:
+        logger.info("duplicate webhook event id=%r ignored", event_id)
+        return {"status": "duplicate"}
+
+    logger.info("verified webhook event_type=%r id=%r", event["event_type"], event_id)
     return {"status": "received"}

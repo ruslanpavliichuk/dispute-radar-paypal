@@ -102,7 +102,17 @@ class PayPalClient:
             logger.warning("verify-webhook-signature 400: %.200r", response.text)
             return False
         response.raise_for_status()
-        return response.json().get("verification_status") == "SUCCESS"
+        status = response.json().get("verification_status")
+        if status != "SUCCESS":
+            # usual causes: PAYPAL_WEBHOOK_ID is a different webhook's id, or the API
+            # was not restarted after .env changed
+            logger.warning("verify-webhook-signature returned %s", status)
+        return status == "SUCCESS"
+
+    async def get_dispute(self, dispute_id: str) -> dict:
+        response = await self.request("GET", f"/v1/customer/disputes/{dispute_id}")
+        response.raise_for_status()
+        return response.json()
 
     async def list_disputes(self, page_size: int = 5) -> dict:
         response = await self.request(

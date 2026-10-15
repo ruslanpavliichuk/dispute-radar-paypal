@@ -30,6 +30,19 @@ orders = Table(
 )
 
 
+# One row per verified PayPal webhook delivery. The raw body is deliberately not stored
+# (it carries buyer email and messages); fetch the resource from PayPal when details are
+# needed. The primary key is what makes redelivered events a no-op.
+webhook_events = Table(
+    "webhook_events",
+    metadata,
+    Column("event_id", Text, primary_key=True),
+    Column("event_type", Text, nullable=False),
+    Column("resource_id", Text),
+    Column("received_at", DateTime(timezone=True), nullable=False),
+)
+
+
 def make_engine(url: str) -> Engine:
     if url.startswith("sqlite"):
         # in-memory SQLite for tests: one shared connection across the threadpool
