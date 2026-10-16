@@ -24,6 +24,14 @@ make test   # pytest
 
 `GET /health` confirms the API is up.
 
+## Risk-model data (Olist)
+
+```bash
+make data    # downloads Olist (needs KAGGLE_API_KEY in .env), builds ml/data/processed/risk_snapshots.parquet
+```
+
+If the download fails, put the Kaggle zip at `ml/data/raw/olist.zip` and run `make data` again. The label is a **proxy** (a 1 or 2 star review plus a late delivery or a delivery/product-condition keyword), not real PayPal disputes; the exact rule is in CONTEXT.md section 7.3. Known limits: the base rate drifts across the date splits, and review text is Portuguese.
+
 ## Demo shop (sandbox)
 
 Needs Docker (for Postgres) and Node 20+.

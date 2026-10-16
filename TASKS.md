@@ -35,12 +35,13 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] **Verified live:** first real signed webhooks verify (raw-body splice works); 6 events for one dispute (CREATED + 5 UPDATED) stored once each; escalate took the dispute INQUIRY → UNDER_REVIEW → CHARGEBACK claim
   - [ ] Not reachable (closed on the developer's decision): `adjudicate` / `require-evidence` were refused in every state (PayPal never offered the links on a Resolution-Center-created dispute) and the sandbox create-dispute body is undocumented. **RESOLVED is demonstrated through `accept-claim` in T11** (the link was available on a fresh INQUIRY).
   - Done when: one dispute goes created → resolved, each webhook logged (created → updated proven; resolved moves to T11 via accept-claim)
-- [ ] **T04** Olist pipeline (2h)
-  - [ ] Download script, joins across orders/items/products/sellers/customers/reviews
-  - [ ] Label (proxy) + base rate printed
-  - [ ] Snapshot builder (purchase + daily until est. date + 7, cap 10 rows)
-  - [ ] Features, leakage tests
-  - Done when: `ml/data/processed/risk_snapshots.parquet` exists, base rate printed, leakage tests pass
+- [x] **T04** Olist pipeline (2h)
+  - [x] Download script, joins across orders/items/products/sellers/customers/reviews
+  - [x] Label (proxy) + base rate printed (7.61% of orders; snapshot level 7.16%)
+  - [x] Snapshot builder (daily from purchase to est. date + 7, cap 10 rows; grid independent of shipping)
+  - [x] Features (adds shipped_yet, days_since_ship), leakage tests (mutation-checked)
+  - [x] Done when: `ml/data/processed/risk_snapshots.parquet` exists, base rate printed, leakage tests pass
+  - Findings for T05/T06: base rate drifts by split (train 6.9%, val 9.7%, test 4.9% of snapshots), so expect test PR-AUC to differ from validation; `days_late_so_far` tops out at 7; `seller_late_rate` ignores never-delivered orders (a seller whose orders never arrive looks clean); keyword stems add some label noise ("errad" matches "enterrada"); val labels resolve partly inside the test window (only train is purged).
 - [ ] **T05** Baseline risk model (2h)
   - [ ] LightGBM default params, date split
   - [ ] MLflow run, PR-AUC, recall@top-10%
