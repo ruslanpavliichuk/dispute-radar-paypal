@@ -27,10 +27,14 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Frontend: `web/` Next.js 16 page, `@paypal/react-paypal-js` v10 (PayPal V6 SDK) button per product, `/api/shop/*` same-origin rewrite
   - [x] Verified live: sandbox buyer purchase, green notice, `COMPLETED` row with `capture_id`, `payer_id` and timestamp in Postgres
   - Done when: a sandbox buyer completes a purchase and the order row appears with its capture ID
-- [ ] **T03** Sandbox dispute script (2h)
-  - [ ] `scripts/simulate_dispute.py`
-  - [ ] README guide: file dispute as buyer → webhook → `require-evidence` → `adjudicate`
-  - Done when: one dispute goes created → resolved, each webhook logged
+- [x] **T03** Sandbox dispute script (2h)
+  - [x] `scripts/simulate_dispute.py` (`list` / `show` / `escalate` / `evidence` / `adjudicate`; refuses disputes not in our `orders`, fails closed on unknown statuses, sandbox host allowlist)
+  - [x] `webhook_events` table: verified events recorded (id, type, resource id, time; no body), redelivery is a no-op, DB error returns 503
+  - [x] README guide: tunnel, webhook registration, filing the dispute, running the script
+  - [x] Reviewer + Security agents ran on the diff; findings fixed; 87 tests
+  - [x] **Verified live:** first real signed webhooks verify (raw-body splice works); 6 events for one dispute (CREATED + 5 UPDATED) stored once each; escalate took the dispute INQUIRY → UNDER_REVIEW → CHARGEBACK claim
+  - [ ] Not reachable (closed on the developer's decision): `adjudicate` / `require-evidence` were refused in every state (PayPal never offered the links on a Resolution-Center-created dispute) and the sandbox create-dispute body is undocumented. **RESOLVED is demonstrated through `accept-claim` in T11** (the link was available on a fresh INQUIRY).
+  - Done when: one dispute goes created → resolved, each webhook logged (created → updated proven; resolved moves to T11 via accept-claim)
 - [ ] **T04** Olist pipeline (2h)
   - [ ] Download script, joins across orders/items/products/sellers/customers/reviews
   - [ ] Label (proxy) + base rate printed
@@ -72,7 +76,9 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [ ] Channel3 attribute check for "not as described" claims
   - [ ] Claude draft (cites only backend-passed evidence), decision layer, store proposal
   - [ ] On approval: `provide-evidence` / `make-offer` / `send-message` / `accept-claim`
-  - [ ] Webhook replay protection: dedupe on event `id` and check `paypal-transmission-time` skew before any action (deferred from T01 review, finding J)
+  - [ ] Add `accept-claim` (and `make-offer`) to `scripts/simulate_dispute.py`; accepting a fresh INQUIRY dispute should produce the first `CUSTOMER.DISPUTE.RESOLVED` webhook (buyer favour). Settle via `adjudicate` is not available (T03 finding). **CONTEXT.md §11 demo step "adjudicate shows a win" needs developer-approved rewording** (e.g. accept / offer).
+  - [ ] Webhook replay protection: event-id dedupe exists (T03 `webhook_events`); still to add: `paypal-transmission-time` skew check
+  - [ ] Acting on events: add a nullable `processed_at` to `webhook_events` and treat a duplicate as done **only when it is set**, otherwise a crash after the insert makes PayPal's retry a skipped duplicate (T03 review). Note `resource_id` is a dispute id only for `CUSTOMER.DISPUTE.*`; key on event type.
   - [ ] Rate-limit the public webhook and `POST /api/shop/orders` at the proxy; purge stale `CREATED` orders (deferred from T01/T02 reviews)
   - Done when: a sandbox dispute gets a proposal and an approved proposal reaches PayPal
 - [ ] **T12** Prevention agent (2h)
