@@ -1,4 +1,4 @@
-.PHONY: setup dev test train db catalogue web
+.PHONY: setup dev test train db catalogue web data
 
 db:
 	docker compose up -d db
@@ -20,3 +20,7 @@ train:
 
 web:
 	cd web && npm run dev
+
+data:
+	uv run python -m ml.data.download_olist
+	uv run python -m ml.build_risk_dataset

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     database_url: str = ""
     # only read by scripts/fetch_catalogue.py; the shop never calls Channel3 at runtime
     channel3_api_key: str = ""
+    # only read by ml/data/download_olist.py; a KGAT_ token needs no username
+    kaggle_api_key: str = ""
+    kaggle_username: str = ""
     # /docs and /openapi.json are public through the dev tunnel, so off unless asked for
     enable_docs: bool = False
 

@@ -16,6 +16,7 @@ __pycache__/
 .ruff_cache/
 mlruns/
 ml/data/raw/
+ml/data/processed/
 
 # Node / Next.js
 node_modules/
