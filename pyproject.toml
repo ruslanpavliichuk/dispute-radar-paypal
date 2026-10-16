@@ -12,6 +12,8 @@ dependencies = [
     "paypal-server-sdk>=2.4,<3",
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.2",
+    "pandas>=2.2",
+    "pyarrow>=17",
 ]
 
 [dependency-groups]
