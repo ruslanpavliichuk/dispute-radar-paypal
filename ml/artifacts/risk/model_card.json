@@ -1,0 +1,200 @@
+{
+  "model": "LightGBM + isotonic calibration",
+  "git_commit": "0f8e392",
+  "data_hash": "3844f4066047c01d",
+  "winner": {
+    "num_leaves": 15,
+    "learning_rate": 0.03,
+    "min_child_samples": 200,
+    "weight": "full",
+    "best_iteration": 84,
+    "valA_order_pr_auc": 0.6538671768076879,
+    "valA_pr_auc": 0.4392919643200504
+  },
+  "sweep": [
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.1,
+      "min_child_samples": 200,
+      "weight": "sqrt",
+      "best_iteration": 60,
+      "valA_order_pr_auc": 0.6383526882190511,
+      "valA_pr_auc": 0.4414888796575423
+    },
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.1,
+      "min_child_samples": 1000,
+      "weight": "full",
+      "best_iteration": 63,
+      "valA_order_pr_auc": 0.6536874259690155,
+      "valA_pr_auc": 0.4409579500867358
+    },
+    {
+      "num_leaves": 15,
+      "learning_rate": 0.03,
+      "min_child_samples": 200,
+      "weight": "full",
+      "best_iteration": 84,
+      "valA_order_pr_auc": 0.6538671768076879,
+      "valA_pr_auc": 0.4392919643200504
+    },
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.03,
+      "min_child_samples": 1000,
+      "weight": "none",
+      "best_iteration": 80,
+      "valA_order_pr_auc": 0.6434785469988001,
+      "valA_pr_auc": 0.4430222762476433
+    },
+    {
+      "num_leaves": 63,
+      "learning_rate": 0.05,
+      "min_child_samples": 50,
+      "weight": "full",
+      "best_iteration": 106,
+      "valA_order_pr_auc": 0.6554094418986111,
+      "valA_pr_auc": 0.44485788989303743
+    },
+    {
+      "num_leaves": 63,
+      "learning_rate": 0.03,
+      "min_child_samples": 1000,
+      "weight": "full",
+      "best_iteration": 267,
+      "valA_order_pr_auc": 0.6525557761325638,
+      "valA_pr_auc": 0.44449056733122627
+    },
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.1,
+      "min_child_samples": 1000,
+      "weight": "none",
+      "best_iteration": 19,
+      "valA_order_pr_auc": 0.645911011983241,
+      "valA_pr_auc": 0.4427745180839605
+    },
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.05,
+      "min_child_samples": 50,
+      "weight": "full",
+      "best_iteration": 128,
+      "valA_order_pr_auc": 0.6559471102680314,
+      "valA_pr_auc": 0.4449299531430339
+    },
+    {
+      "num_leaves": 63,
+      "learning_rate": 0.03,
+      "min_child_samples": 1000,
+      "weight": "sqrt",
+      "best_iteration": 153,
+      "valA_order_pr_auc": 0.6547303277053805,
+      "valA_pr_auc": 0.4455657506879746
+    },
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.1,
+      "min_child_samples": 50,
+      "weight": "none",
+      "best_iteration": 17,
+      "valA_order_pr_auc": 0.6522722312734183,
+      "valA_pr_auc": 0.4414590374572672
+    },
+    {
+      "num_leaves": 31,
+      "learning_rate": 0.03,
+      "min_child_samples": 50,
+      "weight": "none",
+      "best_iteration": 114,
+      "valA_order_pr_auc": 0.6348384241135216,
+      "valA_pr_auc": 0.44148439802513434
+    },
+    {
+      "num_leaves": 63,
+      "learning_rate": 0.05,
+      "min_child_samples": 50,
+      "weight": "sqrt",
+      "best_iteration": 85,
+      "valA_order_pr_auc": 0.6454474417856986,
+      "valA_pr_auc": 0.44366808587057766
+    }
+  ],
+  "n_distinct_calibrator_steps": 125,
+  "ranges": {
+    "train": [
+      "2016-09-04",
+      "2018-02-13"
+    ],
+    "val": [
+      "2018-03-01",
+      "2018-05-31"
+    ],
+    "test": [
+      "2018-06-01",
+      "2018-08-29"
+    ]
+  },
+  "valB_calibrated (in-sample for the calibrator)": {
+    "base_rate": 0.0942838057066514,
+    "pr_auc": 0.4259132728200628,
+    "roc_auc": 0.8270373131033577,
+    "brier": 0.06707728667223983,
+    "recall_top10": 0.45384615384615384,
+    "order_pr_auc": 0.6405550748856795,
+    "order_recall_top10": 0.7439271255060729,
+    "ece": 5.233736380102333e-18
+  },
+  "test_calibrated": {
+    "base_rate": 0.04901804247165895,
+    "pr_auc": 0.3106555964320336,
+    "roc_auc": 0.770396987426433,
+    "brier": 0.040661004893981105,
+    "recall_top10": 0.46460369163952225,
+    "order_pr_auc": 0.44916097769867425,
+    "order_recall_top10": 0.5841476655808904,
+    "ece": 0.02592990733136691,
+    "mean_predicted": 0.07238271619939347,
+    "brier_constant_val_rate": 0.04866426330515197,
+    "diag_brier_prior_shift_oracle": 0.03944152783133157,
+    "distinct_calibrated_values": 141
+  },
+  "test_raw_ranking (before isotonic ties)": {
+    "base_rate": 0.04901804247165895,
+    "pr_auc": 0.3203174334563714,
+    "roc_auc": 0.7714639233982004,
+    "brier": 0.13185154529766152,
+    "recall_top10": 0.46612377850162867,
+    "order_pr_auc": 0.4626228263455296,
+    "order_recall_top10": 0.5841476655808904
+  },
+  "notes": [
+    "Calibrator fitted on validation half B, which has a higher base rate than test (0.094 vs 0.049), so test probabilities over-predict on average. Not corrected: production has no future labels. diag_brier_prior_shift_oracle is a diagnostic that peeks at test labels.",
+    "Label is a proxy (CONTEXT.md 7.3), not real PayPal disputes.",
+    "SHAP values are exact TreeSHAP in raw log-odds, before calibration.",
+    "Isotonic creates tied scores, so calibrated ranking metrics can differ slightly from raw ones.",
+    "Use threshold_table.json by_stage for decisions: a seller scores an order at a given moment, and at checkout only the day-0 row exists. retrospective_any_time takes each order's highest-risk snapshot, which uses delivery information from after purchase and is an upper bound, not purchase-time performance.",
+    "Goodwill refund (cost 10% of order value) reduces to risk > 10%, which flags most orders at low precision: a finding about the cost assumption, not a recommendation."
+  ],
+  "test_by_stage": {
+    "purchase (day 0, what a seller sees at checkout)": {
+      "rows": 18789,
+      "base_rate": 0.04901804247165895,
+      "mean_predicted": 0.11793302633199995,
+      "ece": 0.068914983860341
+    },
+    "days 1 to 7": {
+      "rows": 44535,
+      "base_rate": 0.05510272819131021,
+      "mean_predicted": 0.10375024067721637,
+      "ece": 0.04967158319126453
+    },
+    "day 8 onwards": {
+      "rows": 124566,
+      "base_rate": 0.046842637637878715,
+      "mean_predicted": 0.05429754464614951,
+      "ece": 0.011609900372934448
+    }
+  }
+}
