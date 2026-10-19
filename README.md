@@ -32,6 +32,8 @@ make data    # downloads Olist (needs KAGGLE_API_KEY in .env), builds ml/data/pr
 
 If the download fails, put the Kaggle zip at `ml/data/raw/olist.zip` and run `make data` again. The label is a **proxy** (a 1 or 2 star review plus a late delivery or a delivery/product-condition keyword), not real PayPal disputes; the exact rule is in CONTEXT.md section 7.3. Known limits: the base rate drifts across the date splits, and review text is Portuguese.
 
+`make disputes` generates 20,000 synthetic disputes into `ml/data/processed/disputes.parquet` from the published rules in `ml/generator_rules.yaml` (seeded, deterministic) and prints win rates per claim type. **The labels follow our own rules, which model PayPal Seller Protection; they are not real PayPal outcomes.**
+
 `make train` runs a 12-candidate LightGBM sweep, fits an isotonic calibrator, and writes the model, calibrator, model card, calibration plot, SHAP importance and threshold tables to `ml/artifacts/risk/` (about 30 seconds). Runs are logged to MLflow (`mlflow ui --backend-store-uri sqlite:///mlflow.db`). The T05 baseline stays in `ml/artifacts/risk_baseline/` for comparison. Read `model_card.json` before trusting the numbers: risk is only informative once shipping signals exist, and the calibrator over-predicts on the later test period.
 
 ## Demo shop (sandbox)

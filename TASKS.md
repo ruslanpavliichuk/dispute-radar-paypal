@@ -61,10 +61,14 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - Open for the developer (T10/T12): per-stage calibration, and whether the demo claims prevention at checkout or from first shipping onwards.
   - Reviewer findings fixed: decision-unit framing, `deterministic=True`, pure `select_winner` with tests, tie-aware ECE bins, `diag_` prefix on the test-label diagnostic. Not fixed: unseen categories are scored silently (log in T10).
 
-- [ ] **T07** Dispute generator (2h)
-  - [ ] `generator_rules.yaml`, `generate_disputes.py`, 20k rows
-  - [ ] Summary stats per claim type
-  - Done when: generated file exists, win rates per claim type match rules within 2 points
+- [x] **T07** Dispute generator (2h)
+  - [x] `ml/generator_rules.yaml` (published rules), `ml/generate_disputes.py`, 20k rows, `make disputes`
+  - [x] Summary stats per claim type (expected vs observed win rate, gap in points)
+  - [x] Done when: generated file exists, win rates per claim type match rules within 2 points (worst gap 1.1 points; the check fails the run otherwise)
+  - Mix: not_received 38%, not_as_described 28%, unauthorised 15%, other 20% (other raised from 10%: at 10% its sampling noise alone (about 1.1 points) failed the 2-point check on some seeds; now about 1.5% of 200 seeds fail). Overall win rate 62%, claim types 42% to 75%; 13.5% of disputes are weak (p < 0.35), 31% strong (p > 0.8). Base log-odds were lowered by 1.0 from a first draft (80% overall win rate would make "fight" dominate the decision layer).
+  - `true_win_prob` is the oracle probability for scoring models in T08/T13; never a feature (`FEATURES` in `generate_disputes.py` excludes it).
+  - Caveat to repeat in README/Evaluation page: the weights are our judgement, not PayPal's numbers.
+
 - [ ] **T08** Outcome model (2h)
   - [ ] LightGBM, isotonic calibration, SHAP per row
   - Done when: `ml/artifacts/outcome/` written with Brier, log loss, ECE, calibration plot

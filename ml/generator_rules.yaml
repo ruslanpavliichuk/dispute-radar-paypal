@@ -1,0 +1,85 @@
+# Rules behind the synthetic dispute data (T07). Published on purpose.
+#
+# These rules are OUR MODEL of how PayPal Seller Protection tends to decide a dispute: proof of
+# delivery, shipping to the transaction address, a signature on high-value orders, and answering
+# inside PayPal's deadline all help the seller. The weights are judgement calls, not PayPal's
+# real numbers, and the labels are not real PayPal outcomes. Anything measured against this
+# data (the outcome model, the LLM benchmark) tests learning of known structure, not PayPal.
+#
+# Win probability for a dispute = sigmoid(base_logit + category logit + sum of matching terms).
+# The label is then drawn as a Bernoulli(probability), so the data carries real uncertainty.
+#
+# Term kinds: flag (feature true adds weight), above (feature > value adds weight),
+# per_unit (weight x min(feature, cap)). A term with `when_flag` applies only when that flag is true.
+
+seed: 7
+n_rows: 20000
+
+claim_types:
+  not_received:                # item never arrived
+    share: 0.38
+    base_logit: -2.0
+    terms:
+      - {feature: delivery_confirmed, kind: flag, weight: 2.0}
+      - {feature: tracking_uploaded, kind: flag, weight: 0.8}
+      - {feature: shipped_to_paypal_address, kind: flag, weight: 1.2}
+      - {feature: signature_confirmed, kind: flag, weight: 0.8}
+      - {feature: order_value, kind: above, value: 250, when_flag: signature_confirmed, weight: 0.6}
+      - {feature: response_days, kind: above, value: 10, weight: -1.5}   # PayPal's 10 day deadline
+      - {feature: buyer_prior_disputes, kind: per_unit, cap: 5, weight: 0.2}
+      - {feature: seller_account_age_months, kind: per_unit, cap: 60, weight: 0.012}
+  not_as_described:            # item arrived but is not what was advertised
+    share: 0.27
+    base_logit: -1.6
+    terms:
+      - {feature: photos_supplied, kind: flag, weight: 1.0}
+      - {feature: delivery_confirmed, kind: flag, weight: 0.6}
+      - {feature: tracking_uploaded, kind: flag, weight: 0.3}
+      - {feature: shipped_to_paypal_address, kind: flag, weight: 0.5}
+      - {feature: response_days, kind: above, value: 10, weight: -1.5}
+      - {feature: buyer_prior_disputes, kind: per_unit, cap: 5, weight: 0.2}
+      - {feature: seller_account_age_months, kind: per_unit, cap: 60, weight: 0.012}
+  unauthorised:                # buyer says they did not make the purchase
+    share: 0.15
+    base_logit: -1.8
+    terms:
+      - {feature: shipped_to_paypal_address, kind: flag, weight: 1.8}
+      - {feature: signature_confirmed, kind: flag, weight: 1.0}
+      - {feature: delivery_confirmed, kind: flag, weight: 0.8}
+      - {feature: tracking_uploaded, kind: flag, weight: 0.4}
+      - {feature: response_days, kind: above, value: 10, weight: -1.5}
+      - {feature: buyer_prior_disputes, kind: per_unit, cap: 5, weight: -0.2}   # repeat claimants are likelier real fraud victims here
+      - {feature: seller_account_age_months, kind: per_unit, cap: 60, weight: 0.012}
+  other:
+    share: 0.20
+    base_logit: -1.0
+    terms:
+      - {feature: delivery_confirmed, kind: flag, weight: 0.5}
+      - {feature: photos_supplied, kind: flag, weight: 0.4}
+      - {feature: tracking_uploaded, kind: flag, weight: 0.3}
+      - {feature: response_days, kind: above, value: 10, weight: -1.0}
+
+# Small category effects in log-odds (categories mirror the demo shop's short list).
+categories:
+  electronics: {share: 0.20, logit: -0.2}
+  fashion:     {share: 0.20, logit: -0.1}
+  home:        {share: 0.18, logit: 0.1}
+  beauty:      {share: 0.12, logit: 0.0}
+  sports:      {share: 0.10, logit: 0.0}
+  toys:        {share: 0.08, logit: 0.1}
+  books:       {share: 0.07, logit: 0.2}
+  other:       {share: 0.05, logit: 0.0}
+
+# How the dispute fields themselves are drawn (before the rules above are applied).
+fields:
+  order_value: {median: 60, sigma: 0.9, min: 5, max: 2000}   # GBP, lognormal
+  high_value_threshold: 250                                   # GBP; signatures are likelier above it
+  tracking_uploaded: 0.78
+  delivery_confirmed_given_tracking: 0.85                     # impossible without tracking
+  signature_confirmed_given_delivery: 0.30
+  signature_confirmed_given_delivery_high_value: 0.70
+  shipped_to_paypal_address: 0.92
+  photos_supplied: 0.35
+  response_days: {gamma_shape: 2.0, gamma_scale: 2.0, max: 20}   # mean about 4 days
+  seller_account_age_months: {median: 18, sigma: 0.9, min: 1, max: 120}
+  buyer_prior_disputes_poisson_mean: 0.4
