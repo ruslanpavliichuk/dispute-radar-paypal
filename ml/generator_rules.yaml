@@ -6,7 +6,11 @@
 # real numbers, and the labels are not real PayPal outcomes. Anything measured against this
 # data (the outcome model, the LLM benchmark) tests learning of known structure, not PayPal.
 #
-# Win probability for a dispute = sigmoid(base_logit + category logit + sum of matching terms).
+# Outcomes use the PayPal API's dispute_outcome codes. "won" (the seller) means
+# RESOLVED_SELLER_FAVOUR or RESOLVED_WITH_PAYOUT; RESOLVED_BUYER_FAVOUR is a loss;
+# CANCELED_BY_BUYER has no winner and is excluded from win rates and training (developer-approved).
+#
+# Win probability for a dispute = sigmoid(base_logit + lifecycle stage + category logit + sum of matching terms).
 # The label is then drawn as a Bernoulli(probability), so the data carries real uncertainty.
 #
 # Term kinds: flag (feature true adds weight), above (feature > value adds weight),
@@ -26,7 +30,6 @@ claim_types:
       - {feature: signature_confirmed, kind: flag, weight: 0.8}
       - {feature: order_value, kind: above, value: 250, when_flag: signature_confirmed, weight: 0.6}
       - {feature: response_days, kind: above, value: 10, weight: -1.5}   # PayPal's 10 day deadline
-      - {feature: buyer_prior_disputes, kind: per_unit, cap: 5, weight: 0.2}
       - {feature: seller_account_age_months, kind: per_unit, cap: 60, weight: 0.012}
   not_as_described:            # item arrived but is not what was advertised
     share: 0.27
@@ -37,7 +40,6 @@ claim_types:
       - {feature: tracking_uploaded, kind: flag, weight: 0.3}
       - {feature: shipped_to_paypal_address, kind: flag, weight: 0.5}
       - {feature: response_days, kind: above, value: 10, weight: -1.5}
-      - {feature: buyer_prior_disputes, kind: per_unit, cap: 5, weight: 0.2}
       - {feature: seller_account_age_months, kind: per_unit, cap: 60, weight: 0.012}
   unauthorised:                # buyer says they did not make the purchase
     share: 0.15
@@ -48,7 +50,6 @@ claim_types:
       - {feature: delivery_confirmed, kind: flag, weight: 0.8}
       - {feature: tracking_uploaded, kind: flag, weight: 0.4}
       - {feature: response_days, kind: above, value: 10, weight: -1.5}
-      - {feature: buyer_prior_disputes, kind: per_unit, cap: 5, weight: -0.2}   # repeat claimants are likelier real fraud victims here
       - {feature: seller_account_age_months, kind: per_unit, cap: 60, weight: 0.012}
   other:
     share: 0.20
@@ -58,6 +59,12 @@ claim_types:
       - {feature: photos_supplied, kind: flag, weight: 0.4}
       - {feature: tracking_uploaded, kind: flag, weight: 0.3}
       - {feature: response_days, kind: above, value: 10, weight: -1.0}
+
+# Where a dispute sits in PayPal's flow (the API's dispute_life_cycle_stage). An escalated
+# CHARGEBACK is decided by PayPal reviewing evidence, so it is harder for the seller (judgement).
+lifecycle_stages:
+  INQUIRY:    {share: 0.65, logit: 0.2}
+  CHARGEBACK: {share: 0.35, logit: -0.5}
 
 # Small category effects in log-odds (categories mirror the demo shop's short list).
 categories:
@@ -80,6 +87,8 @@ fields:
   signature_confirmed_given_delivery_high_value: 0.70
   shipped_to_paypal_address: 0.92
   photos_supplied: 0.35
+  canceled_by_buyer_rate: 0.06                # buyer withdraws: no winner, kept in the file but not trained on
+  payout_given_win_if_eligible: 0.70          # tracking + delivery + right address: Seller Protection payout likely
+  payout_given_win_otherwise: 0.10
   response_days: {gamma_shape: 2.0, gamma_scale: 2.0, max: 20}   # mean about 4 days
   seller_account_age_months: {median: 18, sigma: 0.9, min: 1, max: 120}
-  buyer_prior_disputes_poisson_mean: 0.4
