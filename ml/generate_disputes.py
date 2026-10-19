@@ -21,8 +21,18 @@ TOLERANCE = 0.02  # empirical win rate must be within 2 points of the rule-impli
 FEATURES = [
     "claim_type", "order_value", "tracking_uploaded", "delivery_confirmed", "signature_confirmed",
     "shipped_to_paypal_address", "photos_supplied", "response_days", "seller_account_age_months",
-    "buyer_prior_disputes", "category",
+    "lifecycle_stage", "category",
 ]
+
+# The seller wins on these outcome codes (PayPal API dispute_outcome); CANCELED_BY_BUYER has no winner.
+OUTCOME_TO_WON = {"RESOLVED_SELLER_FAVOUR": 1, "RESOLVED_WITH_PAYOUT": 1, "RESOLVED_BUYER_FAVOUR": 0}
+# API `reason` -> our claim_type. Values are from the pasted dataset description and one sandbox
+# dispute (MERCHANDISE_OR_SERVICE_NOT_RECEIVED); verify against live API responses in T10.
+API_REASON_TO_CLAIM_TYPE = {
+    "MERCHANDISE_OR_SERVICE_NOT_RECEIVED": "not_received", "ITEM_NOT_RECEIVED": "not_received",
+    "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED": "not_as_described", "SIGNIFICANTLY_NOT_AS_DESCRIBED": "not_as_described",
+    "UNAUTHORISED": "unauthorised", "UNAUTHORIZED_TRANSACTION": "unauthorised",
+}  # anything else -> "other"
 
 
 def load_rules(path: Path = RULES) -> dict:
@@ -35,7 +45,7 @@ def _lognormal(rng, n, spec) -> np.ndarray:
 
 def draw_fields(rules: dict, n: int, rng: np.random.Generator) -> pd.DataFrame:
     f = rules["fields"]
-    claims, cats = rules["claim_types"], rules["categories"]
+    claims, cats, stages = rules["claim_types"], rules["categories"], rules["lifecycle_stages"]
     value = np.round(_lognormal(rng, n, f["order_value"]), 2)
     tracking = rng.random(n) < f["tracking_uploaded"]
     delivered = tracking & (rng.random(n) < f["delivery_confirmed_given_tracking"])
@@ -52,7 +62,7 @@ def draw_fields(rules: dict, n: int, rng: np.random.Generator) -> pd.DataFrame:
         "photos_supplied": rng.random(n) < f["photos_supplied"],
         "response_days": np.minimum(np.round(rng.gamma(r["gamma_shape"], r["gamma_scale"], n)), r["max"]).astype(int),
         "seller_account_age_months": np.round(_lognormal(rng, n, f["seller_account_age_months"])).astype(int),
-        "buyer_prior_disputes": rng.poisson(f["buyer_prior_disputes_poisson_mean"], n),
+        "lifecycle_stage": rng.choice(list(stages), n, p=[c["share"] for c in stages.values()]),
         "category": rng.choice(list(cats), n, p=[c["share"] for c in cats.values()]),
     })
 
@@ -60,6 +70,7 @@ def draw_fields(rules: dict, n: int, rng: np.random.Generator) -> pd.DataFrame:
 def win_probability(df: pd.DataFrame, rules: dict) -> np.ndarray:
     """Rule-implied probability that the seller wins each dispute."""
     logit = df["category"].map({k: v["logit"] for k, v in rules["categories"].items()}).to_numpy(dtype=float)
+    logit = logit + df["lifecycle_stage"].map({k: v["logit"] for k, v in rules["lifecycle_stages"].items()}).to_numpy(dtype=float)
     for claim, spec in rules["claim_types"].items():
         rows = (df["claim_type"] == claim).to_numpy()
         logit = logit + rows * spec["base_logit"]
@@ -84,14 +95,25 @@ def generate(rules: dict, n: int | None = None, seed: int | None = None) -> pd.D
     rng = np.random.default_rng(rules["seed"] if seed is None else seed)
     df = draw_fields(rules, n, rng)
     df["true_win_prob"] = win_probability(df, rules)
-    df["won"] = (rng.random(n) < df["true_win_prob"]).astype(int)
+    f = rules["fields"]
+    won = rng.random(n) < df["true_win_prob"]
+    eligible = df["tracking_uploaded"] & df["delivery_confirmed"] & df["shipped_to_paypal_address"]
+    payout = rng.random(n) < np.where(eligible, f["payout_given_win_if_eligible"], f["payout_given_win_otherwise"])
+    canceled = rng.random(n) < f["canceled_by_buyer_rate"]
+    df["outcome_code"] = np.where(
+        canceled, "CANCELED_BY_BUYER",
+        np.where(won, np.where(payout, "RESOLVED_WITH_PAYOUT", "RESOLVED_SELLER_FAVOUR"), "RESOLVED_BUYER_FAVOUR"),
+    )
+    df["won"] = df["outcome_code"].map(OUTCOME_TO_WON).astype("Int64")  # <NA> when canceled
     df.insert(0, "dispute_id", [f"SYN-{i:06d}" for i in range(n)])
     return df
 
 
 def summarise(df: pd.DataFrame) -> pd.DataFrame:
-    g = df.groupby("claim_type").agg(n=("won", "size"), expected_win_rate=("true_win_prob", "mean"), win_rate=("won", "mean"))
-    g["share"] = g["n"] / len(df)
+    """Win rates per claim type over resolved disputes (cancelled ones have no winner)."""
+    resolved = df[df["won"].notna()].assign(won=lambda d: d["won"].astype(float))
+    g = resolved.groupby("claim_type").agg(n=("won", "size"), expected_win_rate=("true_win_prob", "mean"), win_rate=("won", "mean"))
+    g["share"] = g["n"] / len(resolved)
     g["gap_points"] = (g["win_rate"] - g["expected_win_rate"]) * 100
     return g
 
@@ -101,10 +123,15 @@ def main() -> None:
     df = generate(rules)
     summary = summarise(df)
     print(summary.round(4).to_string())
-    print(f"overall win rate {df['won'].mean():.3f}, rows {len(df):,}")
+    print(f"overall win rate {df['won'].astype(float).mean():.3f} (resolved), rows {len(df):,}")
+    print(df["outcome_code"].value_counts(normalize=True).round(3).to_string())
     worst = summary["gap_points"].abs().max()
     if worst > TOLERANCE * 100:
-        raise SystemExit(f"win rate off the rules by {worst:.2f} points (limit {TOLERANCE * 100:.0f})")
+        raise SystemExit(
+            f"win rate off the rules by {worst:.2f} points (limit {TOLERANCE * 100:.0f}). With about 3,700 rows in the "
+            "smallest class sampling noise alone trips this on roughly 1 seed in 20: if you only edited weights, "
+            "try another `seed` in ml/generator_rules.yaml before suspecting the rules."
+        )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(OUT, index=False)
     print(f"wrote {OUT}")
