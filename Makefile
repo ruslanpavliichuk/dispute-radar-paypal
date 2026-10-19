@@ -1,4 +1,4 @@
-.PHONY: setup dev test train db catalogue web data
+.PHONY: setup dev test train db catalogue web data disputes
 
 db:
 	docker compose up -d db
@@ -20,6 +20,9 @@ train:
 
 web:
 	cd web && npm run dev
+
+disputes:
+	uv run python -m ml.generate_disputes
 
 data:
 	uv run python -m ml.data.download_olist
