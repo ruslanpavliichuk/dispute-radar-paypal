@@ -1,0 +1,16 @@
+{
+  "delivered_yet": 0.8587548874382155,
+  "days_to_est": 0.15242792911373876,
+  "days_since_purchase": 0.14322609404443634,
+  "seller_low_review_rate": 0.13605117490384067,
+  "category": 0.1167769369622298,
+  "days_since_ship": 0.11267732292959333,
+  "n_items": 0.07077757786515618,
+  "same_state": 0.053833363948294584,
+  "days_late_so_far": 0.04956078027408239,
+  "order_value": 0.04181768416325624,
+  "est_window_days": 0.03295333228075054,
+  "shipped_yet": 0.018583313590894643,
+  "seller_late_rate": 0.012148058322947288,
+  "freight_share": 0.003960136593084133
+}

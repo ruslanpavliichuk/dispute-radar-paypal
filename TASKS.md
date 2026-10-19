@@ -51,10 +51,16 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Week 2 — ML core (Oct 17–23, 10h)
 
-- [ ] **T06** Risk model final (2h)
-  - [ ] Small tuning sweep (num_leaves, learning rate, min_child_samples)
-  - [ ] Isotonic calibration, SHAP, threshold analysis
-  - Done when: `ml/artifacts/risk/` holds model + calibrator + model card (test Brier, PR-AUC, calibration plot)
+- [x] **T06** Risk model final (2h)
+  - [x] 12-candidate sweep (leaves, learning rate, min_child_samples, class weight), picked on val half A by order-level PR-AUC; isotonic on val half B; test scored once
+  - [x] SHAP (LightGBM `pred_contrib`), threshold analysis by stage, calibration plot (`ml/train_risk_final.py`, `ml/risk_model.py`)
+  - [x] Done when: `ml/artifacts/risk/` holds model, calibrator, model card with test Brier, PR-AUC and the calibration plot
+  - Test: snapshot PR-AUC 0.311 (baseline 0.299), ROC-AUC 0.770, recall@top10% 0.465, Brier 0.0407 (constant guess 0.0487, uncalibrated baseline 0.0403), ECE 0.026. Order level (best snapshot, retrospective): PR-AUC 0.449, recall@top10% 0.584. The sweep barely mattered (valA 0.635 to 0.656).
+  - **Finding: the model has no skill at purchase time.** At day 0, flagging at risk >= 10% flags 80% of orders at 5.3% precision (base rate 4.9%), and the calibrator over-predicts there (mean 0.118 vs 0.049). Skill appears once shipping and delivery signals exist (day 8 onwards: 12% flagged, 22% precision, 57% recall). `delivered_yet` carries about 86% of mean |SHAP|. The Evaluation page must use `threshold_table.json` `by_stage`; `retrospective_any_time` is an upper bound.
+  - Goodwill refund (10% of order value) reduces to risk > 10%: flags most orders at day 0 at low precision. Show as a finding.
+  - Open for the developer (T10/T12): per-stage calibration, and whether the demo claims prevention at checkout or from first shipping onwards.
+  - Reviewer findings fixed: decision-unit framing, `deterministic=True`, pure `select_winner` with tests, tie-aware ECE bins, `diag_` prefix on the test-label diagnostic. Not fixed: unseen categories are scored silently (log in T10).
+
 - [ ] **T07** Dispute generator (2h)
   - [ ] `generator_rules.yaml`, `generate_disputes.py`, 20k rows
   - [ ] Summary stats per claim type
