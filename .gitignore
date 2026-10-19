@@ -15,6 +15,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 mlruns/
+mlflow.db
 ml/data/raw/
 ml/data/processed/
 

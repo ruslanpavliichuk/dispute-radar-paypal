@@ -42,10 +42,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Features (adds shipped_yet, days_since_ship), leakage tests (mutation-checked)
   - [x] Done when: `ml/data/processed/risk_snapshots.parquet` exists, base rate printed, leakage tests pass
   - Findings for T05/T06: base rate drifts by split (train 6.9%, val 9.7%, test 4.9% of snapshots), so expect test PR-AUC to differ from validation; `days_late_so_far` tops out at 7; `seller_late_rate` ignores never-delivered orders (a seller whose orders never arrive looks clean); keyword stems add some label noise ("errad" matches "enterrada"); val labels resolve partly inside the test window (only train is purged).
-- [ ] **T05** Baseline risk model (2h)
-  - [ ] LightGBM default params, date split
-  - [ ] MLflow run, PR-AUC, recall@top-10%
-  - Done when: test metrics logged in MLflow and saved to a draft model card
+- [x] **T05** Baseline risk model (2h)
+  - [x] LightGBM default params, date split (`ml/train_risk.py`, `make train`)
+  - [x] MLflow run (experiment `risk`, SQLite store), PR-AUC, recall@top-10%
+  - [x] Done when: test metrics logged in MLflow and saved to a draft model card (`ml/artifacts/risk_baseline/model_card.json`)
+  - Baseline (snapshot level, test): PR-AUC 0.299 (base rate 0.049), ROC-AUC 0.766, recall@top10% 0.460, Brier 0.040. Order level (max snapshot score): PR-AUC 0.404, recall@top10% 0.580. Validation PR-AUC 0.426, train 0.568, so the default model overfits and drifts; T06 tunes it and calibrates.
+  - For T06: `delivered_yet` carries 27.5% of gain, then `days_to_est`, `days_late_so_far`; the proxy label is partly defined by lateness, so this is expected. Raw probabilities are uncalibrated (default LightGBM, no class weights).
 
 ## Week 2 — ML core (Oct 17–23, 10h)
 

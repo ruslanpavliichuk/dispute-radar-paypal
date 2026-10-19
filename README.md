@@ -6,7 +6,7 @@ Predicts which PayPal orders will turn into disputes and acts before the buyer f
 
 ## Setup
 
-Requires [`uv`](https://docs.astral.sh/uv/) and Python 3.11+.
+Requires [`uv`](https://docs.astral.sh/uv/) and Python 3.11+. On macOS, LightGBM also needs the OpenMP runtime: `brew install libomp`.
 
 ```bash
 make setup   # uv sync
@@ -31,6 +31,8 @@ make data    # downloads Olist (needs KAGGLE_API_KEY in .env), builds ml/data/pr
 ```
 
 If the download fails, put the Kaggle zip at `ml/data/raw/olist.zip` and run `make data` again. The label is a **proxy** (a 1 or 2 star review plus a late delivery or a delivery/product-condition keyword), not real PayPal disputes; the exact rule is in CONTEXT.md section 7.3. Known limits: the base rate drifts across the date splits, and review text is Portuguese.
+
+`make train` fits the baseline risk model (LightGBM, default parameters), logs it to MLflow (`mlflow ui --backend-store-uri sqlite:///mlflow.db`) and writes a draft model card to `ml/artifacts/risk_baseline/`.
 
 ## Demo shop (sandbox)
 

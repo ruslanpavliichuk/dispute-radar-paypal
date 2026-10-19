@@ -16,7 +16,7 @@ test:
 	uv run pytest
 
 train:
-	@echo "No ML artefacts to train yet (lands in T04-T09)."
+	uv run python -m ml.train_risk
 
 web:
 	cd web && npm run dev
