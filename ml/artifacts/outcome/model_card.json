@@ -1,0 +1,55 @@
+{
+  "model": "LightGBM + isotonic calibration",
+  "git_commit": "dd50efc",
+  "data_hash": "9f55abd4e5bf6f8c",
+  "rows": {
+    "train": 11251,
+    "valA": 1875,
+    "valB": 2813,
+    "test": 2813
+  },
+  "win_rate": {
+    "train": 0.6002133143720558,
+    "valA": 0.6042666666666666,
+    "valB": 0.610024884464984,
+    "test": 0.6160682545325276
+  },
+  "best_iteration": 138,
+  "test": {
+    "calibrated": {
+      "brier": 0.18265651019018622,
+      "log_loss": 0.5426548926698608,
+      "ece": 0.016549229500976603,
+      "roc_auc": 0.7825212113440618,
+      "mean_predicted": 0.6153446007265242
+    },
+    "uncalibrated": {
+      "brier": 0.1820698537323731,
+      "log_loss": 0.5383965314895235,
+      "ece": 0.020052310484513777,
+      "roc_auc": 0.7832534568613623,
+      "mean_predicted": 0.608014778790444
+    },
+    "oracle (true_win_prob, the best any model can do)": {
+      "brier": 0.1807408836780398,
+      "log_loss": 0.5342265591302496,
+      "ece": 0.011863304687761991,
+      "roc_auc": 0.786824656451027,
+      "mean_predicted": 0.6106116562055693
+    },
+    "constant (train win rate)": {
+      "brier": 0.23677953941726446,
+      "log_loss": 0.6664823623634631,
+      "ece": 0.015854940160471953,
+      "roc_auc": 0.5,
+      "mean_predicted": 0.6002133143720556
+    }
+  },
+  "mean_abs_error_vs_true_win_prob": 0.04300077312160166,
+  "notes": [
+    "Trained on resolved disputes only: CANCELED_BY_BUYER rows have no winner.",
+    "Labels are drawn from our published rules (ml/generator_rules.yaml), not real PayPal outcomes: this shows the model recovers known structure, not that it predicts PayPal's decisions.",
+    "The oracle row is the Brier/log loss of the true probabilities; the gap to it is the cost of learning from 20k noisy labels.",
+    "SHAP values are exact TreeSHAP in raw log-odds, before calibration."
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "claim_type": 0.6683032175637734,
+  "delivery_confirmed": 0.5255835499683027,
+  "lifecycle_stage": 0.26435125990289393,
+  "photos_supplied": 0.1554108863459511,
+  "tracking_uploaded": 0.12166930695810246,
+  "shipped_to_paypal_address": 0.0969317412969759,
+  "seller_account_age_months": 0.08890493181765001,
+  "signature_confirmed": 0.08323758616882608,
+  "category": 0.07660989206030412,
+  "response_days": 0.060895910154994265,
+  "order_value": 0.05054122173593341
+}
