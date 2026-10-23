@@ -17,6 +17,7 @@ test:
 
 train:
 	uv run python -m ml.train_risk_final
+	uv run python -m ml.train_outcome
 
 web:
 	cd web && npm run dev

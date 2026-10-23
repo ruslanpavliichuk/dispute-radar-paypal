@@ -128,12 +128,13 @@ def prior_shift_brier(y: np.ndarray, p: np.ndarray, from_rate: float) -> float:
     return float(np.mean((odds / (1 + odds) - y) ** 2))
 
 
-def plot_calibration(curves: dict[str, list[dict]], path: Path) -> None:
+def plot_calibration(curves: dict[str, list[dict]], path: Path, title: str = "Risk model calibration",
+                     lim: float = 0.6, ylabel: str = "observed dispute rate") -> None:
     fig, ax = plt.subplots(figsize=(5, 5))
-    ax.plot([0, 0.6], [0, 0.6], "k--", lw=1, label="perfect")
+    ax.plot([0, lim], [0, lim], "k--", lw=1, label="perfect")
     for name, c in curves.items():
         ax.plot([b["mean_pred"] for b in c], [b["obs_rate"] for b in c], "o-", label=name)
-    ax.set(xlabel="predicted risk", ylabel="observed dispute rate", title="Risk model calibration")
+    ax.set(xlabel="predicted probability", ylabel=ylabel, title=title)
     ax.legend()
     fig.tight_layout()
     fig.savefig(path, dpi=110)

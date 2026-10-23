@@ -70,9 +70,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - **Follow-up (aligned to the PayPal dispute structure, developer-approved):** added `lifecycle_stage` (INQUIRY 65% / CHARGEBACK 35%, chargebacks harder: win rate 52% vs 65%) and `outcome_code` (RESOLVED_SELLER_FAVOUR, RESOLVED_WITH_PAYOUT, RESOLVED_BUYER_FAVOUR, CANCELED_BY_BUYER 6%); `won` is `<NA>` when cancelled, so T08 must train on `won.notna()`. Dropped `buyer_prior_disputes` (not in the API). `API_REASON_TO_CLAIM_TYPE` is in `ml/generate_disputes.py`; verify its values against live API responses in T10. Worst gap now 0.2 points; the 2-point check trips on about 5% of arbitrary seeds (sampling noise), the error message says so.
   - Caveat to repeat in README/Evaluation page: the weights are our judgement, not PayPal's numbers.
 
-- [ ] **T08** Outcome model (2h)
-  - [ ] LightGBM, isotonic calibration, SHAP per row
-  - Done when: `ml/artifacts/outcome/` written with Brier, log loss, ECE, calibration plot
+- [x] **T08** Outcome model (2h)
+  - [x] LightGBM, isotonic calibration, SHAP per row (`ml/train_outcome.py`, `ml/outcome_model.py`, added to `make train`)
+  - [x] Done when: `ml/artifacts/outcome/` written with Brier, log loss, ECE, calibration plot
+  - Test (resolved disputes, random 60/10/15/15 split): Brier 0.1827, log loss 0.5427, ECE 0.0165, ROC-AUC 0.783. The true probabilities score Brier 0.1807, log loss 0.5342, ROC-AUC 0.787 (the ceiling); a constant guess scores Brier 0.2368. Mean |p - true_win_prob| is 0.043. Isotonic improved ECE (0.0201 raw) but slightly worsened log loss (0.5384 raw); kept for consistency with the risk model.
+  - No tuning sweep: the data is iid and synthetic and the model is within 0.002 Brier of the ceiling. Top SHAP: claim_type, delivery_confirmed, lifecycle_stage, photos_supplied.
+  - Scores are against the generator's own rules: this shows the model recovers known structure, not PayPal's real decisions (stated in the model card).
 - [ ] **T09** Claim classifier (2h)
   - [ ] CFPB download, Claude weak labels on 3,000 rows
   - [ ] 1,500 synthetic buyer messages
