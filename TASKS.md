@@ -84,10 +84,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Blind second-LLM labels for the 200 hand-check rows (`ml/artifacts/claims/reviewer_labels.csv`): agrees with the weak label on 171/200 (85.5%), disagrees on 29.
   - [ ] **Adjudicate 29 rows (developer):** fill `human_label` in `ml/artifacts/claims/adjudicate.csv` (text only; labels hidden), then rerun `uv run python -m ml.train_claims`; the model card then reports weak-label agreement, kappa and model macro F1 against that truth (human label where the LLMs disagreed, shared label where they agreed; says so, and that shared mistakes are not caught).
   - Caveat: CFPB is US card complaints, the product sees UK marketplace messages; the synthetic score is on easy LLM-written text.
-- [ ] **T10** Model service (2h)
-  - [ ] `/score/risk`, `/score/claim`, `/score/outcome` in FastAPI, score + top-3 SHAP reasons
-  - [ ] Unit tests; `make train` rebuilds all artefacts
-  - Done when: all three endpoints answer <300ms locally, tests pass
+- [x] **T10** Model service (2h)
+  - [x] `POST /score/risk`, `/score/outcome`, `/score/claim` (`api/scoring.py`), models loaded once in the lifespan; each returns the score plus the top 3 reasons. Risk and outcome reasons are exact TreeSHAP in raw log-odds; claim reasons are occlusion (drop each word group, measure the fall in the predicted class's probability), because a logistic regression on embeddings has no per-word weights. Claim probabilities are uncalibrated.
+  - [x] Strict request models (`extra="forbid"`, bounds, enums, 5,000-char message cap); unseen categories are scored as missing and logged (T06 carry-over). 11 new tests; `make train` rebuilds all three models.
+  - [x] Done when: all three answer well under 300 ms locally (median 4 ms risk, 6 ms outcome, 25 ms claim) and tests pass (159).
+  - Open for T11: the endpoints take model features, not PayPal dispute JSON. The agent has to map a dispute to `OutcomeRequest` (and `API_REASON_TO_CLAIM_TYPE` is still unverified against live API responses). No auth on `/score/*`: put it behind the proxy before T16.
 
 ## Week 3 — Agents and dashboard (Oct 24–30, 10h)
 

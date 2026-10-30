@@ -46,6 +46,7 @@ class RiskModel:
     def __init__(self, booster: lgb.Booster, calibrator: Calibrator, features: list[str], categories: list[str]):
         self.booster, self.calibrator, self.features = booster, calibrator, features
         self.category_dtype = pd.CategoricalDtype(categories)
+        self.dtypes = {"category": self.category_dtype}  # same attribute OutcomeModel has, so callers can treat both alike
 
     @classmethod
     def load(cls, directory: Path = ARTIFACTS) -> "RiskModel":
@@ -59,7 +60,7 @@ class RiskModel:
 
     def _frame(self, df: pd.DataFrame) -> pd.DataFrame:
         X = df[self.features].copy()
-        X["category"] = X["category"].astype(self.category_dtype)  # unseen categories become NaN
+        X["category"] = pd.Categorical(X["category"].where(X["category"].isin(self.category_dtype.categories)), dtype=self.category_dtype)  # unseen categories become NaN
         return X
 
     def raw(self, df: pd.DataFrame) -> np.ndarray:
