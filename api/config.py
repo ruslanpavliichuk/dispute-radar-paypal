@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # only read by ml/data/download_olist.py; a KGAT_ token needs no username
     kaggle_api_key: str = ""
     kaggle_username: str = ""
+    # LLM provider for ml/llm.py: "gemini" (free tier, default) or "claude"; blank model = the provider's default
+    llm_provider: str = "gemini"
+    llm_model: str = ""
+    gemini_api_key: str = ""
+    anthropic_api_key: str = ""
     # /docs and /openapi.json are public through the dev tunnel, so off unless asked for
     enable_docs: bool = False
 

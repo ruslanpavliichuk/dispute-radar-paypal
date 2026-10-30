@@ -1,0 +1,128 @@
+{
+  "model": "BAAI/bge-small-en-v1.5 + LogisticRegression(C=10, balanced)",
+  "git_commit": "5524d73",
+  "data_hash": "3a57dfe4885c1cff",
+  "classes": [
+    "not_received",
+    "not_as_described",
+    "unauthorised",
+    "other"
+  ],
+  "cv_macro_f1_by_C": {
+    "0.3": 0.7384008893859966,
+    "1": 0.7700210502032555,
+    "3": 0.7843897690778785,
+    "10": 0.7932057669273381,
+    "30": 0.7844681184910576
+  },
+  "rows": {
+    "cfpb_weak": {
+      "not_as_described": 334,
+      "not_received": 233,
+      "other": 1156,
+      "unauthorised": 1277
+    },
+    "synthetic": {
+      "not_as_described": 371,
+      "not_received": 375,
+      "other": 373,
+      "unauthorised": 375
+    }
+  },
+  "test": {
+    "cfpb_weak_test": {
+      "n": 591,
+      "macro_f1": 0.7170777908579613,
+      "per_class_f1": {
+        "not_received": 0.6060606060606061,
+        "not_as_described": 0.60431654676259,
+        "unauthorised": 0.8693877551020408,
+        "other": 0.788546255506608
+      },
+      "confusion_matrix": {
+        "labels": [
+          "not_received",
+          "not_as_described",
+          "unauthorised",
+          "other"
+        ],
+        "rows_true_cols_pred": [
+          [
+            30,
+            9,
+            5,
+            7
+          ],
+          [
+            5,
+            42,
+            3,
+            16
+          ],
+          [
+            5,
+            4,
+            213,
+            29
+          ],
+          [
+            8,
+            18,
+            18,
+            179
+          ]
+        ]
+      }
+    },
+    "synthetic_test": {
+      "n": 283,
+      "macro_f1": 0.9517886777056515,
+      "per_class_f1": {
+        "not_received": 0.9625,
+        "not_as_described": 0.9932885906040269,
+        "unauthorised": 0.9180327868852459,
+        "other": 0.9333333333333333
+      },
+      "confusion_matrix": {
+        "labels": [
+          "not_received",
+          "not_as_described",
+          "unauthorised",
+          "other"
+        ],
+        "rows_true_cols_pred": [
+          [
+            77,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            74,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            56,
+            5
+          ],
+          [
+            2,
+            0,
+            2,
+            63
+          ]
+        ]
+      }
+    }
+  },
+  "weak_label_check": null,
+  "notes": [
+    "NOT YET HAND-CHECKED: scores below are agreement with the LLM weak labels, not with a human.",
+    "CFPB narratives are US credit-card complaints; the product sees UK marketplace buyer messages, so the synthetic messages (LLM-written, labelled by construction) are the closest proxy and are easier than real text.",
+    "Narratives are truncated to the embedder's 512-token limit; CFPB redaction tokens (XXXX) are left in."
+  ]
+}
