@@ -76,11 +76,14 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - Test (resolved disputes, random 60/10/15/15 split): Brier 0.1827, log loss 0.5427, ECE 0.0165, ROC-AUC 0.783. The true probabilities score Brier 0.1807, log loss 0.5342, ROC-AUC 0.787 (the ceiling); a constant guess scores Brier 0.2368. Mean |p - true_win_prob| is 0.043. Isotonic improved ECE (0.0201 raw) but slightly worsened log loss (0.5384 raw); kept for consistency with the risk model.
   - No tuning sweep: the data is iid and synthetic and the model is within 0.002 Brier of the ceiling. Top SHAP: claim_type, delivery_confirmed, lifecycle_stage, photos_supplied.
   - Scores are against the generator's own rules: this shows the model recovers known structure, not PayPal's real decisions (stated in the model card).
-- [ ] **T09** Claim classifier (2h)
-  - [ ] CFPB download, Claude weak labels on 3,000 rows
-  - [ ] 1,500 synthetic buyer messages
-  - [ ] fastembed + logistic regression, hand-check 200
-  - Done when: `ml/artifacts/claims/` written with macro F1 and confusion matrix
+- [~] **T09** Claim classifier (2h)
+  - [x] CFPB narratives (`ml/data/download_cfpb.py`: the CFPB API and bulk CSV no longer carry narrative text, so it reads the CC0 Hugging Face mirror; 28,898 card-dispute rows), `make claims`
+  - [x] Weak labels on 3,000 rows and 1,497 synthetic buyer messages from **Gemini** (`ml/label_claims.py`, `ml/llm.py` with `LLM_PROVIDER=claude` as the switch; CONTEXT.md still says Claude, needs the developer-approved rewording)
+  - [x] fastembed `BAAI/bge-small-en-v1.5` + logistic regression (C=10 by CV), JSON weights, `make train`
+  - [x] Done when: `ml/artifacts/claims/` has macro F1 and the confusion matrix. Test macro F1: CFPB (vs Gemini labels, 591 rows) 0.717, synthetic (283 rows) 0.952. Weak-label mix: unauthorised 1,277, other 1,156, not_as_described 334, not_received 233. Weakest classes: not_received 0.61 and not_as_described 0.60 F1.
+  - [x] Blind second-LLM labels for the 200 hand-check rows (`ml/artifacts/claims/reviewer_labels.csv`): agrees with the weak label on 171/200 (85.5%), disagrees on 29.
+  - [ ] **Adjudicate 29 rows (developer):** fill `human_label` in `ml/artifacts/claims/adjudicate.csv` (text only; labels hidden), then rerun `uv run python -m ml.train_claims`; the model card then reports weak-label agreement, kappa and model macro F1 against that truth (human label where the LLMs disagreed, shared label where they agreed; says so, and that shared mistakes are not caught).
+  - Caveat: CFPB is US card complaints, the product sees UK marketplace messages; the synthetic score is on easy LLM-written text.
 - [ ] **T10** Model service (2h)
   - [ ] `/score/risk`, `/score/claim`, `/score/outcome` in FastAPI, score + top-3 SHAP reasons
   - [ ] Unit tests; `make train` rebuilds all artefacts
