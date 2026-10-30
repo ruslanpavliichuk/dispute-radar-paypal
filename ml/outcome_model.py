@@ -32,7 +32,7 @@ class OutcomeModel(RiskModel):
     def _frame(self, df: pd.DataFrame) -> pd.DataFrame:
         X = df[self.features].copy()
         for c, dtype in self.dtypes.items():
-            X[c] = X[c].astype(dtype)  # unseen levels become NaN
+            X[c] = pd.Categorical(X[c].where(X[c].isin(dtype.categories)), dtype=dtype)  # unseen levels become NaN
         for c in X.columns.difference(list(self.dtypes)):
             X[c] = X[c].astype(float)  # bool and int columns
         return X
