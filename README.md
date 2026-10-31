@@ -2,7 +2,7 @@
 
 Predicts which PayPal orders will turn into disputes and acts before the buyer files one. Calibrated LightGBM models with SHAP explanations, and an evidence-backed response when a dispute still arrives. Built for the PayPal AI Hackathon 2026.
 
-**Status:** early build (T01 and T02 done: webhook intake and the sandbox demo shop). This README covers setup for what exists today; a full run guide lands at T18.
+**Status:** early build (T01 to T10 done: webhook intake, demo shop, risk, outcome and claim models, scoring API). This README covers setup for what exists today; a full run guide lands at T18.
 
 ## Setup
 
@@ -35,6 +35,37 @@ If the download fails, put the Kaggle zip at `ml/data/raw/olist.zip` and run `ma
 `make disputes` generates 20,000 synthetic disputes into `ml/data/processed/disputes.parquet` from the published rules in `ml/generator_rules.yaml` (seeded, deterministic) and prints win rates per claim type. Outcomes use PayPal's `dispute_outcome` codes (seller wins on RESOLVED_SELLER_FAVOUR and RESOLVED_WITH_PAYOUT; CANCELED_BY_BUYER is kept but never trained on). **The labels follow our own rules, which model PayPal Seller Protection; they are not real PayPal outcomes.**
 
 `make train` runs a 12-candidate LightGBM sweep, fits an isotonic calibrator, and writes the model, calibrator, model card, calibration plot, SHAP importance and threshold tables to `ml/artifacts/risk/` (about 30 seconds). Runs are logged to MLflow (`mlflow ui --backend-store-uri sqlite:///mlflow.db`). The T05 baseline stays in `ml/artifacts/risk_baseline/` for comparison. Read `model_card.json` before trusting the numbers: risk is only informative once shipping signals exist, and the calibrator over-predicts on the later test period.
+
+## Choosing an LLM (no vendor lock-in)
+
+An LLM is used in three places: weak-labelling CFPB narratives and writing synthetic buyer messages (claim classifier training), drafting dispute responses, and the benchmark against the trained model. All of it goes through one function, `ml/llm.py: complete_json(prompt, schema)`, and the provider is a setting in `.env`. **The shipped training run used Gemini's free tier, because the author chose not to pay for API credits. Nothing in the project requires a particular vendor.**
+
+| Provider | `.env` |
+|---|---|
+| Gemini (default, free tier at [aistudio.google.com](https://aistudio.google.com)) | `LLM_PROVIDER=gemini`, `GEMINI_API_KEY=...` |
+| Claude | `LLM_PROVIDER=claude`, `ANTHROPIC_API_KEY=...` |
+| Any OpenAI-compatible API (OpenAI, xAI Grok, ...) | `LLM_PROVIDER=openai`, `LLM_API_KEY=...`, `LLM_BASE_URL=https://api.x.ai/v1`, `LLM_MODEL=<model name>` |
+
+Set `LLM_MODEL` to override the default model (required for `openai`). Gemini was run end to end; the Claude and OpenAI-compatible paths are covered by mocked tests only and have not been run against the live APIs. A model that cannot return JSON matching a schema will not work. Free tiers are rate-limited and may use prompts to improve the vendor's products: fine for public CFPB text and synthetic data, not for real customer data.
+
+## Training the models
+
+The trained models are committed under `ml/artifacts/` (risk, outcome, claims), so the API runs without training. To rebuild them:
+
+```bash
+make data      # Olist for the risk model (see above)
+make disputes  # synthetic disputes for the outcome model
+make claims    # claim classifier data: CFPB narratives (about 900 MB download, deleted after filtering) + LLM labels. NEEDS an LLM key.
+make train     # risk model, outcome model, claim classifier
+```
+
+`make claims` makes about 400 LLM calls and takes 30 to 40 minutes on Gemini's free tier. Answers are cached in `ml/data/processed/claims_*.jsonl`, so a crash or rate limit resumes instead of starting over; delete those files to relabel from scratch with another provider. `make train` takes a few minutes; if your machine struggles, prefix it with `OMP_NUM_THREADS=2`.
+
+**Claim classifier honesty note.** The 3,000 CFPB labels come from an LLM, not a human. A second blind LLM labelled a 200-row sample and a human labelled every row where they disagreed (`ml/artifacts/claims/`). On that sample the model scores macro F1 0.74 (weakest class: `not_as_described`, 0.53), and the weak labels agree with the checked truth 94% of the time. 171 of the 200 truths are two LLMs agreeing, so shared mistakes are not caught. CFPB complaints are US card disputes; the product sees UK marketplace messages.
+
+## Scoring API
+
+`make dev` also serves `POST /score/risk`, `/score/outcome` and `/score/claim` (request fields are in `api/scoring.py`). Each returns a score and the top 3 reasons: SHAP values for the risk and outcome models, and for claims the stretches of the message that most support the label. The claim probabilities are not calibrated. There is no authentication yet; it goes behind the proxy before deployment.
 
 ## Demo shop (sandbox)
 

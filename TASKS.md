@@ -78,7 +78,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - Scores are against the generator's own rules: this shows the model recovers known structure, not PayPal's real decisions (stated in the model card).
 - [~] **T09** Claim classifier (2h)
   - [x] CFPB narratives (`ml/data/download_cfpb.py`: the CFPB API and bulk CSV no longer carry narrative text, so it reads the CC0 Hugging Face mirror; 28,898 card-dispute rows), `make claims`
-  - [x] Weak labels on 3,000 rows and 1,497 synthetic buyer messages from **Gemini** (`ml/label_claims.py`, `ml/llm.py` with `LLM_PROVIDER=claude` as the switch; CONTEXT.md still says Claude, needs the developer-approved rewording)
+  - [x] Weak labels on 3,000 rows and 1,497 synthetic buyer messages from **Gemini** (`ml/label_claims.py`, `ml/llm.py` with `LLM_PROVIDER=claude` as the switch; `LLM_PROVIDER` also takes `claude` or `openai` (any OpenAI-compatible API, e.g. Grok); CONTEXT.md and README reworded 2026-10-31)
   - [x] fastembed `BAAI/bge-small-en-v1.5` + logistic regression (C=10 by CV), JSON weights, `make train`
   - [x] Done when: `ml/artifacts/claims/` has macro F1 and the confusion matrix. Test macro F1: CFPB (vs Gemini labels, 591 rows) 0.717, synthetic (283 rows) 0.952. Weak-label mix: unauthorised 1,277, other 1,156, not_as_described 334, not_received 233. Weakest classes: not_received 0.61 and not_as_described 0.60 F1.
   - [x] Blind second-LLM labels for the 200 hand-check rows (`ml/artifacts/claims/reviewer_labels.csv`): agrees with the weak label on 171/200 (85.5%), disagrees on 29.
