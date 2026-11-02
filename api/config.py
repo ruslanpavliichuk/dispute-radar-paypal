@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     gemini_api_key: str = ""
     anthropic_api_key: str = ""
+    # response agent (T11b): the background loop that turns dispute-created events into proposals
+    agent_enabled: bool = True
+    agent_poll_seconds: float = 5.0
+    seller_account_age_months: int = 18  # the dispute does not carry it
+    dispute_fee_minor: int = 1400  # pence, CHARGEBACK only; our assumption, not checked against PayPal
+    offer_share_pct: int = 30  # share of the order value offered back as a partial refund
     # /docs and /openapi.json are public through the dev tunnel, so off unless asked for
     enable_docs: bool = False
 

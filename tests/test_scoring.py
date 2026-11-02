@@ -21,6 +21,7 @@ def client():
     # module scope so the saved artefacts load once; the autouse conftest fixture is per-test, so patch settings here
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(settings, "database_url", "sqlite://")
+        mp.setattr(settings, "agent_enabled", False)
         mp.setattr(settings, "paypal_client_id", "id")  # lifespan checks these but never calls PayPal at startup
         mp.setattr(settings, "paypal_client_secret", "secret")
         with TestClient(app) as c:

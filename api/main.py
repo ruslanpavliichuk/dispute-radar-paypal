@@ -1,10 +1,12 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from paypalserversdk.configuration import Environment
 from paypalserversdk.http.auth.o_auth_2 import ClientCredentialsAuthCredentials
 from paypalserversdk.paypal_serversdk_client import PaypalServersdkClient
 
+from agents.runner import loop
 from api.config import require_settings, settings
 from api.db import init_db, make_engine
 from api.paypal_client import PayPalClient
@@ -32,7 +34,14 @@ async def lifespan(app: FastAPI):
         app.state.engine = make_engine(settings.database_url)
         try:
             init_db(app.state.engine)
-            yield
+            agent = asyncio.create_task(loop(app)) if settings.agent_enabled else None
+            try:
+                yield
+            finally:
+                if agent:
+                    agent.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await agent
         finally:
             app.state.engine.dispose()
     finally:

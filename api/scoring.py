@@ -79,7 +79,7 @@ class ClaimScore(BaseModel):
     reasons: list[dict]  # {"text": the stretch of message, "contribution": probability drop when removed}
 
 
-def _tabular(model, body: BaseModel, name: str) -> TabularScore:
+def score_tabular(model, body: BaseModel, name: str) -> TabularScore:
     df = pd.DataFrame([body.model_dump()])
     numeric = df.columns.difference(list(model.dtypes))
     df[numeric] = df[numeric].astype(float)  # None becomes NaN (an object column would be rejected), flags become 0/1
@@ -91,19 +91,22 @@ def _tabular(model, body: BaseModel, name: str) -> TabularScore:
     return TabularScore(score=float(model.score(df)[0]), reasons=reasons)
 
 
+def classify(clf: ClaimClassifier, text: str) -> ClaimScore:
+    p = clf.proba([text])[0]
+    return ClaimScore(label=clf.classes[int(p.argmax())], scores=dict(zip(clf.classes, map(float, p))),
+                      reasons=clf.explain(text))
+
+
 @router.post("/risk", response_model=TabularScore)
 def score_risk(body: RiskRequest, request: Request) -> TabularScore:
-    return _tabular(request.app.state.models["risk"], body, "risk")
+    return score_tabular(request.app.state.models["risk"], body, "risk")
 
 
 @router.post("/outcome", response_model=TabularScore)
 def score_outcome(body: OutcomeRequest, request: Request) -> TabularScore:
-    return _tabular(request.app.state.models["outcome"], body, "outcome")
+    return score_tabular(request.app.state.models["outcome"], body, "outcome")
 
 
 @router.post("/claim", response_model=ClaimScore)
 def score_claim(body: ClaimRequest, request: Request) -> ClaimScore:
-    clf: ClaimClassifier = request.app.state.models["claim"]
-    p = clf.proba([body.text])[0]
-    return ClaimScore(label=clf.classes[int(p.argmax())], scores=dict(zip(clf.classes, map(float, p))),
-                      reasons=clf.explain(body.text))
+    return classify(request.app.state.models["claim"], body.text)
