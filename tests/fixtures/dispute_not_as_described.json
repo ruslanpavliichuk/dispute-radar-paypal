@@ -1,0 +1,98 @@
+{
+  "dispute_id": "PP-R-TST-00000002",
+  "create_time": "2026-11-02T13:30:44.375Z",
+  "update_time": "2026-11-02T13:30:44.375Z",
+  "disputed_transactions": [
+    {
+      "buyer_transaction_id": "BUYERTXN00000002",
+      "seller_transaction_id": "CAPTURE000000002",
+      "create_time": "2026-11-02T13:26:04.000Z",
+      "transaction_status": "COMPLETED",
+      "gross_amount": {
+        "currency_code": "GBP",
+        "value": "19.60"
+      },
+      "buyer": {
+        "email": "buyer@example.com",
+        "payer_id": "PAYERID000002",
+        "name": "Test Buyer"
+      },
+      "seller": {
+        "email": "seller@example.com",
+        "merchant_id": "MERCHANT000002",
+        "name": "Test Seller"
+      },
+      "items": [
+        {
+          "item_name": "Test product",
+          "item_description": "Test product description",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+          "notes": "item was not as described",
+          "item_type": "PRODUCT"
+        }
+      ],
+      "seller_protection_eligible": false
+    }
+  ],
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+  "status": "OPEN",
+  "dispute_amount": {
+    "currency_code": "GBP",
+    "value": "19.50"
+  },
+  "dispute_state": "UNDER_PAYPAL_REVIEW",
+  "dispute_life_cycle_stage": "INQUIRY",
+  "dispute_channel": "INTERNAL",
+  "messages": [
+    {
+      "posted_by": "BUYER",
+      "time_posted": "2026-11-02T13:30:44.375Z",
+      "content": "s",
+      "documents": [
+        {
+          "name": "Test User",
+          "url": "https://example.com/redacted"
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "merchant_contacted": false,
+    "buyer_contacted_time": "2026-11-02T13:30:43.501Z"
+  },
+  "evidences": [
+    {
+      "evidence_type": "CREATE",
+      "documents": [
+        {
+          "name": "Test User",
+          "url": "https://example.com/redacted"
+        }
+      ],
+      "notes": "s",
+      "source": "SUBMITTED_BY_BUYER",
+      "date": "2026-11-02T13:30:44.375Z",
+      "dispute_life_cycle_stage": "INQUIRY"
+    }
+  ],
+  "offer": {
+    "buyer_requested_amount": {
+      "currency_code": "GBP",
+      "value": "19.50"
+    }
+  },
+  "refund_details": {
+    "allowed_refund_amount": {
+      "currency_code": "GBP",
+      "value": "19.50"
+    }
+  },
+  "links": [
+    {
+      "href": "https://example.com/redacted",
+      "rel": "self",
+      "method": "GET"
+    }
+  ]
+}

@@ -21,22 +21,20 @@ import sys
 from decimal import Decimal, InvalidOperation
 
 import httpx
-from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from api.config import require_settings, settings
-from api.db import make_engine, orders
+from api.db import make_engine
+from api.disputes import DISPUTE_ID, OPEN_STATUSES, linked_order
 from api.paypal_client import PayPalClient
 
-DISPUTE_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 EVIDENCE_ACTIONS = {"seller": "SELLER_EVIDENCE", "buyer": "BUYER_EVIDENCE"}
 OUTCOMES = {"seller": "SELLER_FAVOR", "buyer": "BUYER_FAVOR"}
 # shortcut: two decimals only, wrong for zero-decimal currencies (JPY); the sandbox shop is GBP, handle when one appears
 AMOUNT = re.compile(r"^\d+(\.\d{1,2})?$")
 NOTE = "Resolving the sandbox test dispute."
 # PayPal's own link rel that must be on the dispute before we post the same-named action
-LINK_RELS = {"accept": "accept-claim", "offer": "make-offer"}
-OPEN_STATUSES = {"OPEN", "WAITING_FOR_BUYER_RESPONSE", "WAITING_FOR_SELLER_RESPONSE", "UNDER_REVIEW"}
+LINK_RELS = {"accept": "accept_claim", "offer": "make_offer"}  # rels use underscores, the URL paths use hyphens (checked live)
 
 
 class ScriptError(Exception):
@@ -50,19 +48,6 @@ def describe_error(response) -> str:
         return f"HTTP {response.status_code}: {response.text[:200]}"
     issues = ", ".join(str(d.get("issue", d)) for d in body.get("details", []) or [])
     return f"HTTP {response.status_code} {body.get('name', '')}: {body.get('message', '')} [{issues}]"
-
-
-def linked_order(engine, dispute: dict):
-    capture_ids = [
-        t.get("seller_transaction_id") for t in dispute.get("disputed_transactions") or []
-    ]
-    capture_ids = [c for c in capture_ids if c]
-    if not capture_ids:
-        return None
-    with engine.connect() as conn:
-        return conn.execute(
-            select(orders).where(orders.c.capture_id.in_(capture_ids))
-        ).mappings().first()
 
 
 def summary(dispute: dict, order) -> str:

@@ -22,7 +22,7 @@ def dispute_json(status="UNDER_REVIEW", capture="CAP1", stage="INQUIRY"):
         "dispute_life_cycle_stage": stage,
         "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
         "dispute_amount": {"currency_code": "GBP", "value": "18.00"},
-        "links": [{"rel": "self"}, {"rel": "accept-claim"}, {"rel": "make-offer"}],
+        "links": [{"rel": "self"}, {"rel": "accept_claim"}, {"rel": "make_offer"}],
         "disputed_transactions": [{"seller_transaction_id": capture}],
     }
 
@@ -160,12 +160,13 @@ async def test_accept_and_offer_refuse_a_dispute_that_is_not_ours(paypal, engine
 
 
 @pytest.mark.parametrize(
-    "argv, rel", [(["accept", DISPUTE], "accept-claim"), (["offer", DISPUTE, "5"], "make-offer")]
+    "argv, rel, path",
+    [(["accept", DISPUTE], "accept_claim", "accept-claim"), (["offer", DISPUTE, "5"], "make_offer", "make-offer")],
 )
 async def test_accept_and_offer_refuse_when_paypal_does_not_offer_the_link(
-    paypal, engine, capsys, argv, rel
+    paypal, engine, capsys, argv, rel, path
 ):
-    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/{rel}")
+    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/{path}")
     body = dispute_json()
     body["links"] = [{"rel": "self"}]
     paypal.get_route.mock(return_value=httpx.Response(200, json=body))
