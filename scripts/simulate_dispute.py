@@ -7,6 +7,8 @@ create-dispute API is limited release. This script then moves it along:
     uv run python -m scripts.simulate_dispute show PP-R-ABC-123
     uv run python -m scripts.simulate_dispute evidence PP-R-ABC-123 --party seller
     uv run python -m scripts.simulate_dispute adjudicate PP-R-ABC-123 --outcome seller
+    uv run python -m scripts.simulate_dispute accept PP-R-ABC-123
+    uv run python -m scripts.simulate_dispute offer PP-R-ABC-123 5.00
 
 The dispute id is always explicit, and the script refuses any dispute that is not for a
 capture in our own `orders` table.
@@ -16,19 +18,23 @@ import argparse
 import asyncio
 import re
 import sys
+from decimal import Decimal, InvalidOperation
 
 import httpx
-from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from api.config import require_settings, settings
-from api.db import make_engine, orders
+from api.db import make_engine
+from api.disputes import DISPUTE_ID, OPEN_STATUSES, linked_order
 from api.paypal_client import PayPalClient
 
-DISPUTE_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 EVIDENCE_ACTIONS = {"seller": "SELLER_EVIDENCE", "buyer": "BUYER_EVIDENCE"}
 OUTCOMES = {"seller": "SELLER_FAVOR", "buyer": "BUYER_FAVOR"}
-OPEN_STATUSES = {"OPEN", "WAITING_FOR_BUYER_RESPONSE", "WAITING_FOR_SELLER_RESPONSE", "UNDER_REVIEW"}
+# shortcut: two decimals only, wrong for zero-decimal currencies (JPY); the sandbox shop is GBP, handle when one appears
+AMOUNT = re.compile(r"^\d+(\.\d{1,2})?$")
+NOTE = "Resolving the sandbox test dispute."
+# PayPal's own link rel that must be on the dispute before we post the same-named action
+LINK_RELS = {"accept": "accept_claim", "offer": "make_offer"}  # rels use underscores, the URL paths use hyphens (checked live)
 
 
 class ScriptError(Exception):
@@ -42,19 +48,6 @@ def describe_error(response) -> str:
         return f"HTTP {response.status_code}: {response.text[:200]}"
     issues = ", ".join(str(d.get("issue", d)) for d in body.get("details", []) or [])
     return f"HTTP {response.status_code} {body.get('name', '')}: {body.get('message', '')} [{issues}]"
-
-
-def linked_order(engine, dispute: dict):
-    capture_ids = [
-        t.get("seller_transaction_id") for t in dispute.get("disputed_transactions") or []
-    ]
-    capture_ids = [c for c in capture_ids if c]
-    if not capture_ids:
-        return None
-    with engine.connect() as conn:
-        return conn.execute(
-            select(orders).where(orders.c.capture_id.in_(capture_ids))
-        ).mappings().first()
 
 
 def summary(dispute: dict, order) -> str:
@@ -119,6 +112,9 @@ async def run(args, client: PayPalClient, engine) -> int:
 
         before, _ = await load_our_dispute(client, engine, dispute_id)
         print("before:", before.get("status"), before.get("dispute_life_cycle_stage"))
+        rel = LINK_RELS.get(args.command)
+        if rel and rel not in {link.get("rel") for link in before.get("links") or []}:
+            raise ScriptError(f"PayPal does not offer {rel} on {dispute_id} right now; refusing")
         if args.command == "escalate":
             # an INQUIRY has no require-evidence/adjudicate link; escalating it to a claim
             # moves it to UNDER_REVIEW, where those sandbox actions become available
@@ -127,9 +123,33 @@ async def run(args, client: PayPalClient, engine) -> int:
             await post_action(
                 client, dispute_id, "require-evidence", {"action": EVIDENCE_ACTIONS[args.party]}
             )
-        else:
+        elif args.command == "adjudicate":
             await post_action(
                 client, dispute_id, "adjudicate", {"adjudication_outcome": OUTCOMES[args.outcome]}
+            )
+        elif args.command == "accept":
+            # the exact accept-claim / make-offer bodies are verified live in T11c
+            await post_action(
+                client, dispute_id, "accept-claim",
+                {"note": NOTE, "accept_claim_reason": "REASON_NOT_PROVIDED"},
+            )
+        else:
+            disputed = (before.get("dispute_amount") or {})
+            if not disputed.get("value") or not disputed.get("currency_code"):
+                raise ScriptError(f"{dispute_id} has no dispute amount; refusing to offer")
+            try:
+                cap = Decimal(disputed["value"])
+            except (InvalidOperation, TypeError):
+                raise ScriptError(f"{dispute_id} has an unreadable dispute amount; refusing to offer") from None
+            if args.amount > cap:
+                raise ScriptError(f"offer {args.amount} is above the dispute amount {disputed['value']}")
+            await post_action(
+                client, dispute_id, "make-offer",
+                {
+                    "note": NOTE,
+                    "offer_amount": {"currency_code": disputed["currency_code"], "value": str(args.amount)},
+                    "offer_type": "REFUND",
+                },
             )
         # trust the dispute resource, never the order webhooks arrive in
         after = await client.get_dispute(dispute_id)
@@ -153,9 +173,15 @@ async def run(args, client: PayPalClient, engine) -> int:
 
 
 def dispute_id_arg(value: str) -> str:
-    if not DISPUTE_ID.match(value):
+    if not DISPUTE_ID.fullmatch(value):
         raise argparse.ArgumentTypeError("dispute id must be letters, digits and dashes")
     return value
+
+
+def amount_arg(value: str) -> Decimal:
+    if not AMOUNT.fullmatch(value) or Decimal(value) <= 0:
+        raise argparse.ArgumentTypeError("amount must be a positive number with at most 2 decimals")
+    return Decimal(value)
 
 
 def parse_args(argv):
@@ -173,6 +199,11 @@ def parse_args(argv):
     adjudicate = sub.add_parser("adjudicate", help="settle the dispute (sandbox only)")
     adjudicate.add_argument("dispute_id", type=dispute_id_arg)
     adjudicate.add_argument("--outcome", choices=OUTCOMES, required=True)
+    accept = sub.add_parser("accept", help="accept-claim: refund the buyer in full")
+    accept.add_argument("dispute_id", type=dispute_id_arg)
+    offer = sub.add_parser("offer", help="make-offer: offer the buyer a partial refund")
+    offer.add_argument("dispute_id", type=dispute_id_arg)
+    offer.add_argument("amount", type=amount_arg)
     return parser.parse_args(argv)
 
 

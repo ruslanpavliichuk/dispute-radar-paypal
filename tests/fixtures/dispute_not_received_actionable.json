@@ -1,0 +1,153 @@
+{
+  "dispute_id": "PP-R-TST-00000003",
+  "create_time": "2026-11-02T13:28:29.531Z",
+  "update_time": "2026-11-02T13:31:53.862Z",
+  "disputed_transactions": [
+    {
+      "buyer_transaction_id": "BUYERTXN00000003",
+      "seller_transaction_id": "CAPTURE000000003",
+      "create_time": "2026-11-02T13:24:14.000Z",
+      "transaction_status": "HELD",
+      "gross_amount": {
+        "currency_code": "GBP",
+        "value": "80.00"
+      },
+      "buyer": {
+        "email": "buyer@example.com",
+        "payer_id": "PAYERID000003",
+        "name": "Test Buyer"
+      },
+      "seller": {
+        "email": "seller@example.com",
+        "merchant_id": "MERCHANT000003",
+        "name": "Test Seller"
+      },
+      "items": [
+        {
+          "item_name": "Test product",
+          "item_description": "Test product description",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "PRODUCT"
+        }
+      ],
+      "seller_protection_eligible": true,
+      "seller_protection_type": "EXPANDED_SELLER_PROTECTION"
+    }
+  ],
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+  "status": "WAITING_FOR_SELLER_RESPONSE",
+  "dispute_amount": {
+    "currency_code": "GBP",
+    "value": "80.00"
+  },
+  "dispute_state": "REQUIRED_ACTION",
+  "fund_movements": [
+    {
+      "party": "RECEIVER",
+      "amount": {
+        "currency_code": "GBP",
+        "value": "77.08"
+      },
+      "initiated_time": "2026-11-02T13:31:34.000Z",
+      "type": "DEBIT",
+      "reason": "HOLD_PLACED"
+    }
+  ],
+  "dispute_life_cycle_stage": "INQUIRY",
+  "dispute_channel": "INTERNAL",
+  "messages": [
+    {
+      "posted_by": "BUYER",
+      "time_posted": "2026-11-02T13:28:29.531Z",
+      "content": "I did not receive an item.",
+      "documents": [
+        {
+          "name": "Test User",
+          "url": "https://example.com/redacted"
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "buyer_contacted_time": "2026-11-02T13:28:28.603Z"
+  },
+  "evidences": [
+    {
+      "evidence_type": "CREATE",
+      "documents": [
+        {
+          "name": "Test User",
+          "url": "https://example.com/redacted"
+        }
+      ],
+      "notes": "I did not receive an item.",
+      "source": "SUBMITTED_BY_BUYER",
+      "date": "2026-11-02T13:28:29.531Z",
+      "dispute_life_cycle_stage": "INQUIRY"
+    },
+    {
+      "evidence_type": "PROOF_OF_FULFILLMENT",
+      "source": "REQUESTED_FROM_SELLER",
+      "date": "2026-11-02T13:31:53.862Z"
+    }
+  ],
+  "seller_response_due_date": "2026-11-22T13:28:29.531Z",
+  "offer": {
+    "buyer_requested_amount": {
+      "currency_code": "GBP",
+      "value": "80.00"
+    }
+  },
+  "refund_details": {
+    "allowed_refund_amount": {
+      "currency_code": "GBP",
+      "value": "80.00"
+    }
+  },
+  "allowed_response_options": {
+    "accept_claim": {
+      "accept_claim_types": [
+        "PARTIAL_REFUND",
+        "REFUND"
+      ]
+    },
+    "make_offer": {
+      "offer_types": [
+        "REFUND"
+      ]
+    }
+  },
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-TST-00000003",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-TST-00000003/accept-claim",
+      "rel": "accept_claim",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-TST-00000003/provide-evidence",
+      "rel": "provide_evidence",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-TST-00000003/send-message",
+      "rel": "send_message",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-TST-00000003/escalate",
+      "rel": "escalate",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-TST-00000003/make-offer",
+      "rel": "make_offer",
+      "method": "POST"
+    }
+  ]
+}

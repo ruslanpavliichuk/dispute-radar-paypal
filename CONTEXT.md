@@ -11,7 +11,7 @@ Target user: UK small sellers who ship physical goods and take payment through P
 Two flows:
 
 1. **Prevention.** Every paid order gets a dispute-risk score. The score updates on each tracking event. When risk times order value crosses a cost threshold, the prevention agent proposes an action: upload tracking to PayPal, email the buyer a delivery update, or offer a goodwill refund.
-2. **Response.** A `CUSTOMER.DISPUTE.CREATED` webhook starts the response agent. It classifies the claim, scores the win probability, drafts the evidence letter with Claude, and proposes the PayPal action.
+2. **Response.** A `CUSTOMER.DISPUTE.CREATED` webhook starts the response agent. It classifies the claim, scores the win probability, drafts the evidence letter with an LLM, and proposes the PayPal action.
 
 The seller approves every action before anything reaches PayPal.
 
@@ -70,7 +70,7 @@ Everything runs on Render: `web` (Next.js), `api` (FastAPI + agents), `worker` (
 | Evidence, offers, messages, disputes, tracking | Disputes/Tracking REST APIs via `httpx` | All agent actions go through one thin REST layer now, not a mix of toolkit + httpx |
 | Coding assistant context | APIMatic Context Plugin for PayPal Server SDKs | Install in Claude Code |
 | Buyer checkout | PayPal JS SDK | Demo shop |
-| LLM | Claude API, structured JSON output | Drafts, buyer emails, weak labels for the claim classifier, benchmark baseline |
+| LLM | Any chat LLM over an API key, one JSON-in/JSON-out call in `ml/llm.py`: Gemini (free tier, default), Claude or any OpenAI-compatible API such as xAI Grok, chosen in `.env` | Drafts, buyer emails, weak labels for the claim classifier, benchmark baseline |
 | ML | pandas, LightGBM, scikit-learn, SHAP, fastembed, MLflow | fastembed runs ONNX models, no PyTorch |
 | Backend | FastAPI, SQLAlchemy, PostgreSQL, APScheduler | |
 | Frontend | Next.js, Tailwind, AG Grid Community, AG Charts, Bryntum Scheduler | Bryntum: use the trial or sponsor licence |
@@ -128,8 +128,8 @@ Enable **Disputes** and **Transaction search** in the sandbox app's features.
 ### 7.4 Model B: claim classifier (response)
 
 - **Classes:** `not_received`, `not_as_described`, `unauthorised`, `other`.
-- **Data:** CFPB consumer complaint narratives about credit card purchase disputes, downloaded through the CFPB search API (credit card product, narratives only, about 30k rows), plus about 1,500 synthetic buyer messages written by Claude in UK marketplace style.
-- **Labels:** Claude labels a random 3,000 CFPB narratives (weak labels). The developer hand-checks 200 of them; report agreement. Synthetic messages carry their generation label.
+- **Data:** CFPB consumer complaint narratives about credit card purchase disputes, downloaded through the CFPB search API (credit card product, narratives only, about 30k rows), plus about 1,500 synthetic buyer messages written by the LLM in UK marketplace style.
+- **Labels:** the LLM (Gemini in the shipped run, the free tier) labels a random 3,000 CFPB narratives (weak labels). A second blind LLM pass labels the 200-row hand-check sample and the developer labels every row where the two disagree; report agreement and say how many truths are human. Synthetic messages carry their generation label.
 - **Model:** fastembed embeddings (`BAAI/bge-small-en-v1.5`) + logistic regression. Optional upgrade only if time allows: fine-tuned small transformer.
 - **Metrics:** macro F1 and a confusion matrix on a hand-checked test set.
 
@@ -141,7 +141,7 @@ Enable **Disputes** and **Transaction search** in the sandbox app's features.
 
 ### 7.6 Benchmark: trained model vs LLM guess
 
-- Take 300 held-out generated disputes. Describe each one in text, give Claude the same facts plus a summary of the Seller Protection rules, and ask for a win probability.
+- Take 300 held-out generated disputes. Describe each one in text, give the LLM the same facts plus a summary of the Seller Protection rules, and ask for a win probability. Run it with each provider that has a key and report them side by side.
 - Compare Brier score, log loss and calibration curves for the LLM and Model C.
 - Show the result on the Evaluation page and in the README. State the caveat: the labels come from our generator rules, so the benchmark tests calibration on known structure, not real PayPal outcomes.
 
@@ -164,7 +164,7 @@ dispute-radar-paypal/
 ├── render.yaml
 ├── docker-compose.yml
 ├── .env.example           # PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID,
-│                          # ANTHROPIC_API_KEY, CHANNEL3_API_KEY, RESEND_API_KEY, DATABASE_URL
+│                          # LLM_PROVIDER + its key (GEMINI_API_KEY, ANTHROPIC_API_KEY or LLM_API_KEY/LLM_BASE_URL), CHANNEL3_API_KEY, RESEND_API_KEY, DATABASE_URL
 ├── api/                   # FastAPI app, webhooks, PayPal clients, model service
 ├── agents/                # prevention.py, response.py, policies.py
 ├── ml/
@@ -208,14 +208,14 @@ Hours are estimates. One session is 2 hours.
   *Done when:* the generated file exists and win rates per claim type match the rules within 2 points.
 - [ ] **T08 Outcome model (2 h).** LightGBM, isotonic calibration, SHAP per row.
   *Done when:* `ml/artifacts/outcome/` is written with Brier, log loss, ECE and the calibration plot.
-- [ ] **T09 Claim classifier (2 h).** CFPB download, Claude weak labels on 3,000 rows, 1,500 synthetic messages, fastembed + logistic regression, hand-check 200.
+- [ ] **T09 Claim classifier (2 h).** CFPB download, LLM weak labels on 3,000 rows, 1,500 synthetic messages, fastembed + logistic regression, hand-check 200.
   *Done when:* `ml/artifacts/claims/` is written with macro F1 and the confusion matrix.
 - [ ] **T10 Model service (2 h).** `/score/risk`, `/score/claim`, `/score/outcome` in FastAPI, returning score plus top 3 SHAP reasons. Unit tests. `make train` rebuilds all artefacts.
   *Done when:* all three endpoints answer in under 300 ms locally and tests pass.
 
 ### Week 3: Agents and dashboard (Oct 24 to 30, 10 h)
 
-- [ ] **T11 Response agent (2 h).** On `CUSTOMER.DISPUTE.CREATED`: fetch dispute and order, classify, score, check Channel3 product attributes for "not as described" claims, draft with Claude (it may cite only evidence objects the backend passes in), compute the decision layer, store a proposal. On approval: call `provide-evidence`, `make-offer`, `send-message` or `accept-claim`.
+- [ ] **T11 Response agent (2 h).** On `CUSTOMER.DISPUTE.CREATED`: fetch dispute and order, classify, score, check Channel3 product attributes for "not as described" claims, draft with the LLM (it may cite only evidence objects the backend passes in; plain, short, factual wording, no filler or marketing tone), compute the decision layer, store a proposal. On approval: call `provide-evidence`, `make-offer`, `send-message` or `accept-claim`.
   *Done when:* a sandbox dispute gets a proposal and an approved proposal reaches PayPal.
 - [ ] **T12 Prevention agent (2 h).** `scripts/simulate_tracking.py` emits carrier-style events (accepted, in transit, stuck at depot, out for delivery, delivered). The worker re-scores on each event and proposes tracking upload, buyer email or goodwill refund when the threshold is crossed. On approval: call the Agent Toolkit or refund endpoint.
   *Done when:* a "stuck at depot" event raises the score and an approved tracking upload appears on the PayPal order.
@@ -265,7 +265,7 @@ Checklist:
 - [ ] README with setup, run steps and data assumptions
 - [ ] Hosted demo on Render with a sandbox buyer login for judges
 - [ ] Text description of features
-- [ ] Tools section: PayPal Server SDK, PayPal Disputes/Tracking REST APIs, APIMatic Context Plugin, Claude API, LightGBM, SHAP, fastembed, AG Grid, Bryntum, Channel3, Render
+- [ ] Tools section: PayPal Server SDK, PayPal Disputes/Tracking REST APIs, APIMatic Context Plugin, an LLM API (Gemini by default; Claude or Grok by config), LightGBM, SHAP, fastembed, AG Grid, Bryntum, Channel3, Render
 - [ ] Demo video under 3 minutes, public on YouTube
 - [ ] Commits spread across the hackathon period
 
@@ -285,3 +285,7 @@ Add one line per finished task: date, task ID, result, anything the next session
 - 2026-10-19: T06 done. `make train` writes `ml/artifacts/risk/` (290 KB): LightGBM (15 leaves, lr 0.03, 84 trees) + isotonic calibrator (JSON, np.interp), SHAP, threshold tables by stage, calibration plot. Test snapshot PR-AUC 0.311, Brier 0.0407 (val-to-test base-rate shift 9.4% to 4.9% makes it over-predict; documented, not corrected). Key finding: no skill at purchase time (day 0: 80% flagged at 5.3% precision); skill comes from shipping/delivery signals. Decide in T10/T12 whether to calibrate per stage and how the demo frames prevention. MLE reviewer: no leakage; fixed the decision-unit framing and four smaller issues. 135 tests.
 - 2026-10-19: T07 done. `ml/generator_rules.yaml` (published, seed 7) + `ml/generate_disputes.py`: 20,000 disputes, win probability = sigmoid(base + category + evidence terms), label ~ Bernoulli. Worst per-claim-type gap 1.1 points vs rule-implied mean (limit 2); overall win rate 62%. Rebalanced claim mix (other 20%) and lowered base rates after the first draft gave 80% wins and a noisy check. Oracle `true_win_prob` kept out of features. 141 tests.
 - 2026-10-19: T07 follow-up. Generator aligned to the PayPal dispute structure: added lifecycle stage, real outcome codes (win = seller favour or payout; cancelled excluded), dropped buyer_prior_disputes. Worst per-claim-type gap 0.2 points, overall win rate 60% of resolved disputes. T08 trains on resolved rows only. 143 tests.
+- 2026-10-23: T08 done. `ml/train_outcome.py` + `ml/outcome_model.py`: LightGBM + isotonic on resolved disputes, random 60/10/15/15 split. Test Brier 0.1827, log loss 0.5427, ECE 0.0165, ROC-AUC 0.783; the true probabilities score Brier 0.1807 (ceiling), a constant guess 0.2368. Scores are against our own rules, not PayPal outcomes.
+- 2026-10-24: T09 built, 2026-10-31 closed. The CFPB API and bulk CSV no longer carry narrative text, so `ml/data/download_cfpb.py` reads a CC0 Hugging Face mirror (28,898 card-dispute narratives). Developer decision: LLM provider is configurable (`ml/llm.py`), Gemini free tier used for the shipped run to avoid API spend. Weak labels on 3,000 rows + 1,497 synthetic messages; fastembed bge-small + logistic regression. Test macro F1: CFPB vs LLM labels 0.717, synthetic 0.952, hand-checked (200 rows: 29 human labels + 171 two-LLM agreements) 0.738; weak labels agree with that truth 94% (kappa 0.907). Weakest class: not_as_described (0.53).
+- 2026-10-30: T10 done. `api/scoring.py`: `POST /score/risk|outcome|claim`, models loaded in the lifespan, top-3 reasons (SHAP for tabular, occlusion for text). Median latency 4 / 6 / 25 ms. 159 tests. No auth yet on `/score/*` (before T16).
+- 2026-10-31: LLM provider made generic (Gemini, Claude, any OpenAI-compatible API such as Grok) and documented in the README; response drafts to be plain and factual (developer preference).

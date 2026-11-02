@@ -19,11 +19,22 @@ class Settings(BaseSettings):
     # only read by ml/data/download_olist.py; a KGAT_ token needs no username
     kaggle_api_key: str = ""
     kaggle_username: str = ""
-    # LLM provider for ml/llm.py: "gemini" (free tier, default) or "claude"; blank model = the provider's default
+    # LLM provider for ml/llm.py: "gemini" (free tier, default), "claude" or "openai" (OpenAI-compatible); blank model = default
     llm_provider: str = "gemini"
     llm_model: str = ""
+    # "openai" provider: any OpenAI-compatible chat API (OpenAI, xAI Grok https://api.x.ai/v1, local servers...)
+    llm_base_url: str = ""
+    llm_api_key: str = ""
     gemini_api_key: str = ""
     anthropic_api_key: str = ""
+    # response agent (T11b): the background loop that turns dispute-created events into proposals
+    agent_enabled: bool = True
+    agent_poll_seconds: float = 5.0
+    seller_account_age_months: int = 18  # the dispute does not carry it
+    dispute_fee_minor: int = 1400  # pence, CHARGEBACK only; our assumption, not checked against PayPal
+    offer_share_pct: int = 30  # share of the order value offered back as a partial refund
+    # header X-Admin-Token for /api/proposals; blank = approval switched off (503), never open
+    admin_token: str = ""
     # /docs and /openapi.json are public through the dev tunnel, so off unless asked for
     enable_docs: bool = False
 

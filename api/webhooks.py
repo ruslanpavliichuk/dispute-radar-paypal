@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -15,6 +15,8 @@ from api.paypal_client import PayPalClient
 logger = logging.getLogger("dispute_radar.webhooks")
 
 MAX_BODY_BYTES = 256 * 1024
+MAX_FUTURE_SKEW = timedelta(minutes=5)
+MAX_AGE = timedelta(hours=72)  # PayPal retries a failed delivery for up to 3 days
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
@@ -28,6 +30,7 @@ def _store_event(engine, event: dict) -> bool:
     resource = event.get("resource")
     resource = resource if isinstance(resource, dict) else {}
     resource_id = resource.get("dispute_id") or resource.get("id")
+    now = datetime.now(timezone.utc)
     try:
         with engine.begin() as conn:
             conn.execute(
@@ -35,7 +38,9 @@ def _store_event(engine, event: dict) -> bool:
                     event_id=event["id"],
                     event_type=event["event_type"][:100],
                     resource_id=str(resource_id)[:100] if resource_id else None,
-                    received_at=datetime.now(timezone.utc),
+                    received_at=now,
+                    # only dispute-created events with a dispute id are acted on (by the T11b loop)
+                    processed_at=None if event["event_type"] == "CUSTOMER.DISPUTE.CREATED" and resource_id else now,
                 )
             )
     except IntegrityError:
@@ -64,6 +69,15 @@ async def paypal_webhook(request: Request):
         raise HTTPException(status_code=400, detail="body is not valid JSON") from None
     if not isinstance(event, dict):
         raise HTTPException(status_code=400, detail="body is not a JSON object")
+
+    # replay protection: checked before spending a PayPal call on a stale delivery (forged-but-fresh ones still cost a call: rate limit in T16)
+    try:
+        sent_at = datetime.fromisoformat(request.headers["paypal-transmission-time"])
+        age = datetime.now(timezone.utc) - sent_at  # naive timestamp raises TypeError
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="bad transmission time") from None
+    if age < -MAX_FUTURE_SKEW or age > MAX_AGE:
+        raise HTTPException(status_code=400, detail="transmission time outside allowed window")
 
     try:
         verified = await get_paypal_client(request).verify_webhook_signature(
