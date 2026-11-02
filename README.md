@@ -2,7 +2,7 @@
 
 Predicts which PayPal orders will turn into disputes and acts before the buyer files one. Calibrated LightGBM models with SHAP explanations, and an evidence-backed response when a dispute still arrives. Built for the PayPal AI Hackathon 2026.
 
-**Status:** early build (T01 to T10 done: webhook intake, demo shop, risk, outcome and claim models, scoring API). This README covers setup for what exists today; a full run guide lands at T18.
+**Status:** early build (T01 to T13 done: webhook intake, demo shop, risk, outcome and claim models, scoring API, response agent, prevention agent, seller approval API, LLM benchmark). The dashboard (T14) is not built yet, so approvals go through the API. This README covers setup for what exists today; a full run guide lands at T18.
 
 ## Setup
 
@@ -123,3 +123,51 @@ Disputes can't be created through the API, so the buyer files one by hand and `s
 `evidence` (require-evidence) and `adjudicate` are in the script too, but PayPal only accepts them when the dispute's own links include them. **In practice the sandbox does not offer those links on disputes filed through the Resolution Center**, so both return `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE`. The script prints that reason and exits 1. The sandbox create-dispute API is limited-release and its request body is not public.
 
 `webhook_events` stores only the event id, type, resource id and time (never the body, which holds the buyer's email and messages). A redelivered event id is ignored.
+
+## The agents and seller approval
+
+Both agents run as a background loop inside the API process (`AGENT_ENABLED=true`, the default). They **propose**; nothing is sent to PayPal until the seller approves. The LLM only writes draft text; it never decides to call PayPal.
+
+**Response agent.** A verified `CUSTOMER.DISPUTE.CREATED` webhook becomes one proposal: it reads the dispute from PayPal, takes the claim type from the dispute's `reason`, scores the win probability with the outcome model, and picks the action with the best expected value (fight, offer 30% back, or accept; the fee is assumed to be 14 GBP at chargeback stage, unchecked against PayPal). Fighting means `provide_evidence` on item-not-received disputes and a plain message otherwise; it never proposes `escalate`. The draft is written from facts in our own database and cited by id, with a plain template if the LLM fails. The buyer's message text is never sent to the drafting LLM. Win probabilities are crude: the agent cannot see tracking or delivery evidence for a sandbox dispute, so those inputs default to "no" (the defaults are stored on each proposal).
+
+**Prevention agent.** `scripts/simulate_tracking.py` stands in for a carrier feed:
+
+```bash
+uv run python -m scripts.simulate_tracking <PAYPAL_ORDER_ID> accepted --day 1
+uv run python -m scripts.simulate_tracking <PAYPAL_ORDER_ID> in_transit --day 3
+uv run python -m scripts.simulate_tracking <PAYPAL_ORDER_ID> stuck_at_depot --day 16
+```
+
+Each event re-scores the order with the risk model (event time is the clock, so a demo does not have to wait). From the first shipping event onwards, a score above the bar (0.20 in the first week, 0.10 after) proposes a tracking upload; an order past its delivery estimate also gets a goodwill refund proposal (10% of the order). A `delivered` event cancels open proposals. Before shipping the agent does nothing, because the risk model has no skill at checkout (see the risk model card).
+
+Know the limits: the model has **no "stuck at depot" feature**; it sees "shipped, not delivered, time passing", so the score rises only because the event is dated past the 14-day delivery window we assume. It was trained on Brazilian Olist orders and is applied to UK sandbox orders, so scores show how the system behaves, not real UK dispute rates. There is no email service: the buyer is told through PayPal's own notification when tracking is uploaded.
+
+**Approving.** Set `ADMIN_TOKEN` in `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`); without it the routes answer `503`. Send it as the `X-Admin-Token` header:
+
+```bash
+curl -H "X-Admin-Token: $ADMIN_TOKEN" localhost:8000/api/proposals            # list
+curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" localhost:8000/api/proposals/<ID>/approve
+curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" localhost:8000/api/proposals/<ID>/reject
+curl -H "X-Admin-Token: $ADMIN_TOKEN" localhost:8000/api/orders/attention     # MISMATCH, UNKNOWN, stale PENDING orders
+```
+
+Approval makes exactly one PayPal call, after re-reading the dispute or order: it is refused if PayPal no longer offers the action, if the payment is held (for example because of a dispute) or already refunded, if the order has been delivered, or if a refund and a dispute response would pay out twice. Refund amounts are recomputed from the database at approval, never taken from the proposal or the request. Approve may carry a `{"note": "..."}` to replace the draft text (refunds only, up to 255 characters).
+
+Checked live against the sandbox: a refund offer on a dispute, a tracking upload (appears on the PayPal order), two small goodwill refunds (the capture webhook then moved the order to `PARTIALLY_REFUNDED`), and a refusal to act on a disputed order. Subscribe the dashboard webhook to `PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REFUNDED` and `.REVERSED` as well as the dispute events. Not checked live: the `send_message`, `provide_evidence` and `accept_claim` bodies sent through the API.
+
+## Benchmark: trained model vs an LLM's guess
+
+`make benchmark` (or `uv run python -m ml.benchmark_llm`) asks the configured LLM for a win probability on 300 held-out generated disputes, using the same facts the outcome model sees plus a short general summary of PayPal Seller Protection rules, and scores both on the same rows. It writes `ml/artifacts/benchmark.json` and `ml/artifacts/benchmark_calibration.png`. Each provider and model keeps its own entry, so you can run it again with another `LLM_PROVIDER` or `LLM_MODEL` and compare side by side.
+
+Result with Gemini (`gemini-3.1-flash-lite`, free tier), 300 of 300 rows scored, lower is better:
+
+| Predictor | Brier | Log loss | ECE (uniform bins) |
+|---|---|---|---|
+| Trained outcome model | 0.169 | 0.516 | 0.078 |
+| LLM (Gemini) | 0.207 | 0.621 | 0.118 |
+| Constant guess (train win rate) | 0.239 | 0.670 | 0.007 |
+| Oracle (the true generator probability) | 0.166 | 0.504 | 0.046 |
+
+The trained model beats the LLM by 0.038 Brier (95% bootstrap interval +0.012 to +0.065, paired over the same rows). The LLM beats a constant guess, so it does use the facts, but it is overconfident at the low end: where it says about 8%, sellers actually win about 36% of the time. The constant guess has the best ECE because it never varies; ECE alone does not reward telling disputes apart.
+
+Read this with care. The labels come from our own published generator rules (`ml/generator_rules.yaml`), so the benchmark tests calibration on known structure, not how PayPal really decides. The rules summary given to the LLM was written from general public knowledge and still shares the direction of a few effects (the 10-day deadline, stricter chargebacks) with the generator. One model, one prompt and one run: do not read it as a ranking of LLM vendors.

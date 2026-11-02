@@ -1,0 +1,165 @@
+{
+  "n": 300,
+  "seed": 0,
+  "git_commit": "f7f8334",
+  "data_hash": "32bc0766cb029d27",
+  "rules_hash": "e6682b514a9c7d7e",
+  "clip": [
+    0.01,
+    0.99
+  ],
+  "notes": {
+    "ece": "equal-count bins (10); heavily tied scores, such as an LLM that says 0.7 often, are merged into one bin",
+    "ece_uniform": "10 equal-width bins on [0, 1], empty bins skipped, count-weighted",
+    "log_loss": "every predictor is clipped to [0.01, 0.99] first, so it can differ slightly from the T08 model card (clip 1e-6)"
+  },
+  "caveat": "Labels come from our published generator rules (ml/generator_rules.yaml), not real PayPal outcomes: this tests calibration on known structure, not how PayPal decides. The rules summary given to the LLM was written from general public knowledge of Seller Protection, yet it still shares the direction of some effects (the 10-day deadline, stricter chargebacks) with how the labels were generated.",
+  "runs": {
+    "gemini:gemini-3.1-flash-lite": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "n_scored": 300,
+      "n_failed": 0,
+      "n_non_numeric": 0,
+      "n_rescaled_percent": 0,
+      "n_out_of_range_clipped": 0,
+      "metrics": {
+        "llm": {
+          "brier": 0.207,
+          "log_loss": 0.6204729382964469,
+          "ece": 0.10933333333333334,
+          "roc_auc": 0.7612451108213819,
+          "mean_predicted": 0.5619999999999999,
+          "ece_uniform": 0.11766666666666686,
+          "observed_win_rate": 0.6066666666666667
+        },
+        "outcome_model": {
+          "brier": 0.16886974579763678,
+          "log_loss": 0.5160925165142656,
+          "ece": 0.07277912439226925,
+          "roc_auc": 0.8184717824548334,
+          "mean_predicted": 0.6423978876191326,
+          "ece_uniform": 0.07802581077870824,
+          "observed_win_rate": 0.6066666666666667
+        },
+        "constant (train win rate)": {
+          "brier": 0.23866386797806058,
+          "log_loss": 0.670302735171425,
+          "ece": 0.00645335229461097,
+          "roc_auc": 0.5,
+          "mean_predicted": 0.6002133143720557,
+          "ece_uniform": 0.00645335229461097,
+          "observed_win_rate": 0.6066666666666667
+        },
+        "oracle (true_win_prob)": {
+          "brier": 0.1662670874727698,
+          "log_loss": 0.5041247896996578,
+          "ece": 0.05770677032502969,
+          "roc_auc": 0.8208930899608867,
+          "mean_predicted": 0.6380448351782477,
+          "ece_uniform": 0.04548512442730375,
+          "observed_win_rate": 0.6066666666666667
+        }
+      },
+      "calibration": {
+        "llm": [
+          {
+            "mean_pred": 0.08333333333333333,
+            "obs_rate": 0.3541666666666667,
+            "n": 48
+          },
+          {
+            "mean_pred": 0.17826086956521742,
+            "obs_rate": 0.21739130434782608,
+            "n": 23
+          },
+          {
+            "mean_pred": 0.29,
+            "obs_rate": 0.48,
+            "n": 25
+          },
+          {
+            "mean_pred": 0.375,
+            "obs_rate": 0.4523809523809524,
+            "n": 42
+          },
+          {
+            "mean_pred": 0.6166666666666667,
+            "obs_rate": 0.6666666666666666,
+            "n": 24
+          },
+          {
+            "mean_pred": 0.8250000000000001,
+            "obs_rate": 0.75,
+            "n": 52
+          },
+          {
+            "mean_pred": 0.8999999999999999,
+            "obs_rate": 0.7894736842105263,
+            "n": 38
+          },
+          {
+            "mean_pred": 0.9500000000000001,
+            "obs_rate": 0.9166666666666666,
+            "n": 48
+          }
+        ],
+        "outcome_model": [
+          {
+            "mean_pred": 0.25556216049579455,
+            "obs_rate": 0.13157894736842105,
+            "n": 38
+          },
+          {
+            "mean_pred": 0.33607795461243745,
+            "obs_rate": 0.4166666666666667,
+            "n": 24
+          },
+          {
+            "mean_pred": 0.46111946270376336,
+            "obs_rate": 0.4642857142857143,
+            "n": 28
+          },
+          {
+            "mean_pred": 0.5232198142414861,
+            "obs_rate": 0.39473684210526316,
+            "n": 38
+          },
+          {
+            "mean_pred": 0.6329259541310349,
+            "obs_rate": 0.48148148148148145,
+            "n": 27
+          },
+          {
+            "mean_pred": 0.6791391889754281,
+            "obs_rate": 0.75,
+            "n": 28
+          },
+          {
+            "mean_pred": 0.8598311692838303,
+            "obs_rate": 0.8852459016393442,
+            "n": 61
+          },
+          {
+            "mean_pred": 0.9538007058854052,
+            "obs_rate": 0.9215686274509803,
+            "n": 51
+          },
+          {
+            "mean_pred": 0.99,
+            "obs_rate": 0.8,
+            "n": 5
+          }
+        ]
+      },
+      "brier_diff_llm_minus_model": {
+        "mean": 0.03813025420236323,
+        "ci95": [
+          0.01229709332439189,
+          0.06457287269205894
+        ],
+        "bootstraps": 1000
+      }
+    }
+  }
+}

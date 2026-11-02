@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -26,6 +26,7 @@ CATALOGUE = {
 }
 PAID = {"COMPLETED", "PENDING", "PARTIALLY_REFUNDED", "REFUNDED"}
 FAILED = {"DECLINED", "FAILED"}
+PENDING_GRACE = timedelta(minutes=5)  # a PENDING order younger than this may still be in the checkout flow
 
 router = APIRouter(prefix="/api/shop", tags=["shop"])
 
@@ -47,11 +48,29 @@ def now() -> datetime:
 def _get(obj, *names):
     """Walk optional SDK fields. The SDK leaves a field it did not receive unset
     (no attribute at all), so plain attribute access raises after money has moved."""
-    for name in names:
-        obj = getattr(obj, name, None)
+    for name in names:  # also walks plain dicts (PayPal JSON read by the reconciler)
+        obj = obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
         if obj is None:
             return None
     return obj
+
+
+def judge_capture(order_id: str, row, capture) -> str:
+    """The status a capture earns: MISMATCH when it is not what we asked for, UNKNOWN for a status
+    we do not know, else PayPal's own. Shared by checkout and the reconciler."""
+    capture_id = _get(capture, "id")
+    status = _get(capture, "status")
+    currency = _get(capture, "amount", "currency_code")
+    value = _get(capture, "amount", "value")
+    if capture_id is None or currency != row["currency"] or value != money(row["amount_minor"]):
+        logger.critical("ORDER %s capture mismatch: expected %s %s, got %s %s (capture %s)",
+                        order_id, money(row["amount_minor"]), row["currency"], value, currency, capture_id)
+        return "MISMATCH"
+    status = str(status)
+    if status not in PAID | FAILED:
+        logger.critical("ORDER %s capture %s has unexpected status %r", order_id, capture_id, status)
+        return "UNKNOWN"
+    return status
 
 
 def _fetch(engine, order_id: str):
@@ -195,19 +214,12 @@ def capture_order(request: Request, order_id: str = PathParam(pattern=r"^[A-Z0-9
         raise HTTPException(status_code=502, detail="no capture on order")
 
     capture_id = _get(capture, "id")
-    status = _get(capture, "status")
-    currency = _get(capture, "amount", "currency_code")
-    value = _get(capture, "amount", "value")
-    if capture_id is None or currency != row["currency"] or value != money(row["amount_minor"]):
-        logger.critical("ORDER %s capture mismatch: expected %s %s, got %s %s (capture %s)",
-                        order_id, money(row["amount_minor"]), row["currency"], value, currency, capture_id)
-        _record(engine, order_id, status="MISMATCH", capture_id=capture_id, captured_at=now())
+    status = judge_capture(order_id, row, capture)
+    if status == "MISMATCH":
+        _record(engine, order_id, status=status, capture_id=capture_id, captured_at=now())
         raise HTTPException(status_code=502, detail="capture does not match order")
-
-    status = str(status)
-    if status not in PAID | FAILED:
-        logger.critical("ORDER %s capture %s has unexpected status %r", order_id, capture_id, status)
-        _record(engine, order_id, status="UNKNOWN", capture_id=capture_id, captured_at=now())
+    if status == "UNKNOWN":
+        _record(engine, order_id, status=status, capture_id=capture_id, captured_at=now())
         raise HTTPException(status_code=502, detail="unexpected payment status")
 
     payer_id = _get(order, "payer", "payer_id") or _get(order, "payment_source", "paypal", "account_id")

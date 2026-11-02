@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SANDBOX_HOSTS = {"api-m.sandbox.paypal.com", "api.sandbox.paypal.com"}
@@ -33,6 +34,11 @@ class Settings(BaseSettings):
     seller_account_age_months: int = 18  # the dispute does not carry it
     dispute_fee_minor: int = 1400  # pence, CHARGEBACK only; our assumption, not checked against PayPal
     offer_share_pct: int = 30  # share of the order value offered back as a partial refund
+    # prevention agent (T12): risk bars by days since purchase, the assumed delivery window, and the goodwill refund share
+    prevention_min_risk_early: float = 0.20  # events dated under 8 days after purchase
+    prevention_min_risk_late: float = 0.10  # 8 days or more
+    est_window_days: float = 14.0  # our shop has no delivery estimate; see tests/test_prevention.py for how it was chosen
+    goodwill_share_pct: int = Field(10, ge=1, le=50)  # keeps the suggested refund well under the order value
     # header X-Admin-Token for /api/proposals; blank = approval switched off (503), never open
     admin_token: str = ""
     # /docs and /openapi.json are public through the dev tunnel, so off unless asked for

@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.config import settings
 from api.db import webhook_events
+from api.disputes import DISPUTE_ID
 from api.paypal_client import PayPalClient
 
 logger = logging.getLogger("dispute_radar.webhooks")
@@ -17,6 +18,12 @@ logger = logging.getLogger("dispute_radar.webhooks")
 MAX_BODY_BYTES = 256 * 1024
 MAX_FUTURE_SKEW = timedelta(minutes=5)
 MAX_AGE = timedelta(hours=72)  # PayPal retries a failed delivery for up to 3 days
+
+CAPTURE_EVENTS = {
+    "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.DENIED", "PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED",
+}
+
+UP_LINK_EVENTS = {"PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED"}
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
@@ -30,7 +37,15 @@ def _store_event(engine, event: dict) -> bool:
     resource = event.get("resource")
     resource = resource if isinstance(resource, dict) else {}
     resource_id = resource.get("dispute_id") or resource.get("id")
+    if event["event_type"] in UP_LINK_EVENTS:
+        # a refund or reversal event's resource.id is the refund/reversal id; the capture is behind the "up" link
+        up = next((l.get("href") for l in resource.get("links") or [] if isinstance(l, dict) and l.get("rel") == "up"), None)
+        resource_id = str(up).rstrip("/").rsplit("/", 1)[-1] if up else None
     now = datetime.now(timezone.utc)
+    actionable = bool(resource_id) and (
+        event["event_type"] == "CUSTOMER.DISPUTE.CREATED"
+        or event["event_type"] in CAPTURE_EVENTS and DISPUTE_ID.fullmatch(str(resource_id)) is not None
+    )
     try:
         with engine.begin() as conn:
             conn.execute(
@@ -39,8 +54,8 @@ def _store_event(engine, event: dict) -> bool:
                     event_type=event["event_type"][:100],
                     resource_id=str(resource_id)[:100] if resource_id else None,
                     received_at=now,
-                    # only dispute-created events with a dispute id are acted on (by the T11b loop)
-                    processed_at=None if event["event_type"] == "CUSTOMER.DISPUTE.CREATED" and resource_id else now,
+                    # only dispute-created and capture events with a usable id are acted on (by the agent loop)
+                    processed_at=None if actionable else now,
                 )
             )
     except IntegrityError:

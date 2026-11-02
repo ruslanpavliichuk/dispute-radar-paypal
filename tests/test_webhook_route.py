@@ -263,3 +263,21 @@ def test_dispute_created_without_a_dispute_id_is_marked_processed(paypal):
         rows = {r["event_id"]: r["processed_at"] for r in stored_events()}
 
     assert rows["WH-EVT-12"] is not None  # nothing for the agent to fetch, so it must not wait forever
+
+
+def test_capture_events_are_left_for_the_worker_and_others_are_not(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+    events = [
+        {"id": f"WH-C{i}", "event_type": t, "resource": {"id": "CAP-1", "links": [{"rel": "up", "href": "https://x/v2/payments/captures/CAP-1"}]}}
+        for i, t in enumerate(("PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.DENIED",
+                               "PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED", "PAYMENT.CAPTURE.PENDING"))
+    ] + [{"id": "WH-BAD", "event_type": "PAYMENT.CAPTURE.COMPLETED", "resource": {"id": "../x"}}]
+
+    with TestClient(app) as client:
+        for e in events:
+            client.post(URL, content=json.dumps(e), headers=HEADERS)
+        rows = {r["event_id"]: r for r in stored_events()}
+
+    assert [rows[f"WH-C{i}"]["processed_at"] is None for i in range(5)] == [True] * 4 + [False]
+    assert rows["WH-C0"]["resource_id"] == "CAP-1"
+    assert rows["WH-BAD"]["processed_at"] is not None  # unusable id: nothing to look up

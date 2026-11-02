@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 from urllib.parse import urlparse
 
@@ -16,6 +17,7 @@ SIGNATURE_HEADERS = (
     "paypal-transmission-sig",
     "paypal-transmission-time",
 )
+ORDER_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")  # fullmatch; the id goes into a PayPal URL
 CERT_HOSTS = {"api.paypal.com", "api.sandbox.paypal.com", "api-m.paypal.com", "api-m.sandbox.paypal.com"}
 
 
@@ -111,6 +113,13 @@ class PayPalClient:
 
     async def get_dispute(self, dispute_id: str) -> dict:
         response = await self.request("GET", f"/v1/customer/disputes/{dispute_id}")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_order(self, order_id: str) -> dict:
+        if not ORDER_ID.fullmatch(order_id):
+            raise ValueError("invalid order id")
+        response = await self.request("GET", f"/v2/checkout/orders/{order_id}")
         response.raise_for_status()
         return response.json()
 

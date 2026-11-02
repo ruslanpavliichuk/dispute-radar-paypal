@@ -1,4 +1,4 @@
-.PHONY: setup dev test train db catalogue web data disputes claims
+.PHONY: setup dev test train db catalogue web data disputes claims benchmark
 
 db:
 	docker compose up -d db
@@ -33,3 +33,6 @@ data:
 claims:
 	uv run python -m ml.data.download_cfpb
 	uv run python -m ml.label_claims
+
+benchmark:
+	uv run python -m ml.benchmark_llm
