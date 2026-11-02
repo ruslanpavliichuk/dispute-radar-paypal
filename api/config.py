@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     seller_account_age_months: int = 18  # the dispute does not carry it
     dispute_fee_minor: int = 1400  # pence, CHARGEBACK only; our assumption, not checked against PayPal
     offer_share_pct: int = 30  # share of the order value offered back as a partial refund
+    # header X-Admin-Token for /api/proposals; blank = approval switched off (503), never open
+    admin_token: str = ""
     # /docs and /openapi.json are public through the dev tunnel, so off unless asked for
     enable_docs: bool = False
 

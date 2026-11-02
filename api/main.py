@@ -10,6 +10,7 @@ from agents.runner import loop
 from api.config import require_settings, settings
 from api.db import init_db, make_engine
 from api.paypal_client import PayPalClient
+from api.proposals import router as proposals_router
 from api.scoring import load_models
 from api.scoring import router as scoring_router
 from api.shop import router as shop_router
@@ -58,6 +59,7 @@ app = FastAPI(
 )
 app.include_router(webhooks_router)
 app.include_router(shop_router)
+app.include_router(proposals_router)
 app.include_router(scoring_router)
 
 
