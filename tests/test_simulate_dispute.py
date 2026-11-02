@@ -21,6 +21,8 @@ def dispute_json(status="UNDER_REVIEW", capture="CAP1", stage="INQUIRY"):
         "status": status,
         "dispute_life_cycle_stage": stage,
         "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+        "dispute_amount": {"currency_code": "GBP", "value": "18.00"},
+        "links": [{"rel": "self"}, {"rel": "accept-claim"}, {"rel": "make-offer"}],
         "disputed_transactions": [{"seller_transaction_id": capture}],
     }
 
@@ -117,6 +119,77 @@ async def test_only_acts_on_known_open_statuses(paypal, engine, capsys, status):
     assert "will only act on" in capsys.readouterr().err
 
 
+async def test_accept_posts_the_body_and_rereads_the_dispute(paypal, engine, capsys):
+    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/accept-claim").mock(
+        return_value=httpx.Response(202, json={})
+    )
+    paypal.get_route.side_effect = [
+        httpx.Response(200, json=dispute_json()),
+        httpx.Response(200, json=dispute_json("RESOLVED")),
+    ]
+
+    assert await run(["accept", DISPUTE], engine) == 0
+    assert json.loads(route.calls.last.request.content) == {
+        "note": sim.NOTE, "accept_claim_reason": "REASON_NOT_PROVIDED"
+    }
+    assert "after:  RESOLVED" in capsys.readouterr().out
+
+
+async def test_offer_posts_the_body_with_the_disputes_currency(paypal, engine):
+    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/make-offer").mock(
+        return_value=httpx.Response(202, json={})
+    )
+    paypal.get_route.mock(return_value=httpx.Response(200, json=dispute_json()))
+
+    assert await run(["offer", DISPUTE, "5.5"], engine) == 0
+    assert json.loads(route.calls.last.request.content) == {
+        "note": sim.NOTE,
+        "offer_amount": {"currency_code": "GBP", "value": "5.5"},
+        "offer_type": "REFUND",
+    }
+
+
+@pytest.mark.parametrize("argv", [["accept", DISPUTE], ["offer", DISPUTE, "5"]])
+async def test_accept_and_offer_refuse_a_dispute_that_is_not_ours(paypal, engine, argv):
+    accept = paypal.post(f"/v1/customer/disputes/{DISPUTE}/accept-claim")
+    offer = paypal.post(f"/v1/customer/disputes/{DISPUTE}/make-offer")
+    paypal.get_route.mock(return_value=httpx.Response(200, json=dispute_json(capture="SOMEONE-ELSE")))
+
+    assert await run(argv, engine) == 1
+    assert not accept.called and not offer.called
+
+
+@pytest.mark.parametrize(
+    "argv, rel", [(["accept", DISPUTE], "accept-claim"), (["offer", DISPUTE, "5"], "make-offer")]
+)
+async def test_accept_and_offer_refuse_when_paypal_does_not_offer_the_link(
+    paypal, engine, capsys, argv, rel
+):
+    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/{rel}")
+    body = dispute_json()
+    body["links"] = [{"rel": "self"}]
+    paypal.get_route.mock(return_value=httpx.Response(200, json=body))
+
+    assert await run(argv, engine) == 1
+    assert not route.called
+    assert f"does not offer {rel}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("amount", ["0", "-1", "1.234", "abc", "1e2", "NaN"])
+def test_offer_rejects_a_bad_amount(amount):
+    with pytest.raises(SystemExit):
+        sim.parse_args(["offer", DISPUTE, amount])
+
+
+async def test_offer_above_the_dispute_amount_is_refused(paypal, engine, capsys):
+    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/make-offer")
+    paypal.get_route.mock(return_value=httpx.Response(200, json=dispute_json()))
+
+    assert await run(["offer", DISPUTE, "18.01"], engine) == 1
+    assert not route.called
+    assert "above the dispute amount" in capsys.readouterr().err
+
+
 async def test_list_survives_one_bad_item(paypal, engine, capsys):
     paypal.get("/v1/customer/disputes").mock(
         return_value=httpx.Response(
@@ -200,6 +273,24 @@ async def test_unknown_dispute_is_a_clean_error_not_a_traceback(paypal, engine, 
 def test_dispute_id_must_be_plain():
     with pytest.raises(SystemExit):
         sim.parse_args(["show", "../webhooks/paypal"])
+
+
+def test_a_trailing_newline_does_not_pass_the_id_or_amount_check():
+    with pytest.raises(SystemExit):
+        sim.parse_args(["show", DISPUTE + "\n"])
+    with pytest.raises(SystemExit):
+        sim.parse_args(["offer", DISPUTE, "5.00\n"])
+
+
+async def test_offer_with_an_unreadable_dispute_amount_is_a_clean_error(paypal, engine, capsys):
+    route = paypal.post(f"/v1/customer/disputes/{DISPUTE}/make-offer")
+    bad = dispute_json()
+    bad["dispute_amount"] = {"currency_code": "GBP", "value": "N/A"}
+    paypal.get_route.mock(return_value=httpx.Response(200, json=bad))
+
+    assert await run(["offer", DISPUTE, "5.00"], engine) == 1
+    assert not route.called
+    assert "unreadable dispute amount" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

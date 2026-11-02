@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -18,7 +19,7 @@ HEADERS = {
     "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1",
     "paypal-transmission-id": "abc",
     "paypal-transmission-sig": "sig",
-    "paypal-transmission-time": "2026-10-12T00:00:00Z",
+    "paypal-transmission-time": datetime.now(timezone.utc).isoformat(),
 }
 EVENT = {"id": "WH-EVT-1", "event_type": "CUSTOMER.DISPUTE.CREATED"}
 SUCCESS = httpx.Response(200, json={"verification_status": "SUCCESS"})
@@ -142,6 +143,54 @@ def test_verified_event_is_persisted_without_its_body(paypal):
     assert "buyer@example.com" not in str(dict(rows[0]))
 
 
+def test_only_dispute_created_is_left_unprocessed(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+    other = {"id": "WH-EVT-10", "event_type": "CUSTOMER.DISPUTE.UPDATED"}
+
+    with TestClient(app) as client:
+        client.post(URL, content=json.dumps(DISPUTE_EVENT), headers=HEADERS)
+        client.post(URL, content=json.dumps(other), headers=HEADERS)
+        rows = {r["event_id"]: r["processed_at"] for r in stored_events()}
+
+    assert rows["WH-EVT-9"] is None and rows["WH-EVT-10"] is not None
+
+
+def test_redelivered_processed_event_is_200_and_one_row(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+    other = json.dumps({"id": "WH-EVT-11", "event_type": "PAYMENT.CAPTURE.COMPLETED"})
+
+    with TestClient(app) as client:
+        first = client.post(URL, content=other, headers=HEADERS)
+        second = client.post(URL, content=other, headers=HEADERS)
+        rows = stored_events()
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert second.json() == {"status": "duplicate"} and len(rows) == 1
+
+
+def iso(delta):
+    return (datetime.now(timezone.utc) + delta).isoformat()
+
+
+@pytest.mark.parametrize(
+    "sent",
+    [iso(-timedelta(hours=73)), iso(timedelta(minutes=6)), None, "yesterday", "2026-10-12T00:00:00"],
+)
+def test_bad_transmission_time_is_400_without_calling_paypal(paypal, sent):
+    headers = {k: v for k, v in HEADERS.items() if k != "paypal-transmission-time"}
+    if sent:
+        headers["paypal-transmission-time"] = sent
+
+    assert post(headers=headers).status_code == 400
+    assert not paypal.verify_route.called
+
+
+@pytest.mark.parametrize("sent", [iso(-timedelta(hours=71)), iso(timedelta(minutes=4))])
+def test_transmission_time_inside_the_window_passes(paypal, sent):
+    paypal.verify_route.mock(return_value=SUCCESS)
+    assert post(headers={**HEADERS, "paypal-transmission-time": sent}).status_code == 200
+
+
 def test_unverified_event_is_not_persisted(paypal):
     paypal.verify_route.mock(return_value=httpx.Response(200, json={"verification_status": "FAILURE"}))
 
@@ -203,3 +252,14 @@ def test_startup_fails_without_client_credentials(monkeypatch):
     with pytest.raises(RuntimeError, match="PAYPAL_CLIENT_SECRET"):
         with TestClient(app):
             pass
+
+
+def test_dispute_created_without_a_dispute_id_is_marked_processed(paypal):
+    paypal.verify_route.mock(return_value=SUCCESS)
+    event = {"id": "WH-EVT-12", "event_type": "CUSTOMER.DISPUTE.CREATED", "resource": {}}
+
+    with TestClient(app) as client:
+        client.post(URL, content=json.dumps(event), headers=HEADERS)
+        rows = {r["event_id"]: r["processed_at"] for r in stored_events()}
+
+    assert rows["WH-EVT-12"] is not None  # nothing for the agent to fetch, so it must not wait forever

@@ -92,7 +92,9 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Week 3 — Agents and dashboard (Oct 24–30, 10h)
 
-- [ ] **T11** Response agent (2h)
+- [~] **T11** Response agent (2h), run through the full pipeline (plan approved 2026-11-01); split into T11a intake and simulator, T11b agent core, T11c approval
+  - **T11a** (code done, reviewed by Reviewer + Security agents, findings fixed, 189 tests): `webhook_events.processed_at` (set on insert for events we do not act on and for dispute-created events with no dispute id; NULL means waiting for the T11b loop; Postgres ALTER + backfill in `init_db`), `paypal-transmission-time` replay check (400 if missing, unparsable, naive, more than 5 min ahead or older than 72 h, before any PayPal call), `accept` and `offer` commands in `scripts/simulate_dispute.py` gated on PayPal's own links (`accept-claim`, `make-offer`), strict `fullmatch` on ids and amounts. **Still to do for T11a:** the developer files a fresh sandbox dispute (INQUIRY, not escalated) so the real JSON can be saved as `tests/fixtures/dispute_inquiry.json` (settles `API_REASON_TO_CLAIM_TYPE` and where buyer text lives); run the Postgres ALTER once against the dev DB (untested: tests use SQLite).
+  - **Carry into T11b:** claim rows with `SELECT ... FOR UPDATE SKIP LOCKED` (or a conditional UPDATE) and stamp `processed_at` only after the outcome is recorded; always stamp poison events (not ours, 404) with the error; re-validate `resource_id` against `^[A-Za-z0-9-]{1,64}$`, refetch the dispute and run the is-it-our-order check before any PayPal URL; the seller-approval gate must be in code, not the prompt; buyer text goes to the classifier only, never to the drafting LLM. Rate limiting stays in T16 (forged-but-fresh webhooks still cost one PayPal verify call each).
   - [ ] On `CUSTOMER.DISPUTE.CREATED`: fetch dispute + order, classify, score
   - [ ] Channel3 attribute check for "not as described" claims
   - [ ] Claude draft (cites only backend-passed evidence), decision layer, store proposal
