@@ -26,3 +26,6 @@ node_modules/
 # OS / editor
 .DS_Store
 .idea/
+
+# T13 benchmark: the LLM answer cache is a rerunnable by-product; benchmark.json and the png are the tracked results
+ml/artifacts/benchmark/

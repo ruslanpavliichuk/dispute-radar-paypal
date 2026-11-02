@@ -2,7 +2,7 @@
 
 Predicts which PayPal orders will turn into disputes and acts before the buyer files one. Calibrated LightGBM models with SHAP explanations, and an evidence-backed response when a dispute still arrives. Built for the PayPal AI Hackathon 2026.
 
-**Status:** early build (T01 to T12 done: webhook intake, demo shop, risk, outcome and claim models, scoring API, response agent, prevention agent, seller approval API). The dashboard (T14) is not built yet, so approvals go through the API. This README covers setup for what exists today; a full run guide lands at T18.
+**Status:** early build (T01 to T13 done: webhook intake, demo shop, risk, outcome and claim models, scoring API, response agent, prevention agent, seller approval API, LLM benchmark). The dashboard (T14) is not built yet, so approvals go through the API. This README covers setup for what exists today; a full run guide lands at T18.
 
 ## Setup
 
@@ -153,4 +153,21 @@ curl -H "X-Admin-Token: $ADMIN_TOKEN" localhost:8000/api/orders/attention     # 
 
 Approval makes exactly one PayPal call, after re-reading the dispute or order: it is refused if PayPal no longer offers the action, if the payment is held (for example because of a dispute) or already refunded, if the order has been delivered, or if a refund and a dispute response would pay out twice. Refund amounts are recomputed from the database at approval, never taken from the proposal or the request. Approve may carry a `{"note": "..."}` to replace the draft text (refunds only, up to 255 characters).
 
-Checked live against the sandbox: a refund offer on a dispute, a tracking upload (appears on the PayPal order), and a 1.96 GBP goodwill refund. Not checked live: the `send_message`, `provide_evidence` and `accept_claim` bodies sent through the API.
+Checked live against the sandbox: a refund offer on a dispute, a tracking upload (appears on the PayPal order), two small goodwill refunds (the capture webhook then moved the order to `PARTIALLY_REFUNDED`), and a refusal to act on a disputed order. Subscribe the dashboard webhook to `PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REFUNDED` and `.REVERSED` as well as the dispute events. Not checked live: the `send_message`, `provide_evidence` and `accept_claim` bodies sent through the API.
+
+## Benchmark: trained model vs an LLM's guess
+
+`make benchmark` (or `uv run python -m ml.benchmark_llm`) asks the configured LLM for a win probability on 300 held-out generated disputes, using the same facts the outcome model sees plus a short general summary of PayPal Seller Protection rules, and scores both on the same rows. It writes `ml/artifacts/benchmark.json` and `ml/artifacts/benchmark_calibration.png`. Each provider and model keeps its own entry, so you can run it again with another `LLM_PROVIDER` or `LLM_MODEL` and compare side by side.
+
+Result with Gemini (`gemini-3.1-flash-lite`, free tier), 300 of 300 rows scored, lower is better:
+
+| Predictor | Brier | Log loss | ECE (uniform bins) |
+|---|---|---|---|
+| Trained outcome model | 0.169 | 0.516 | 0.078 |
+| LLM (Gemini) | 0.207 | 0.621 | 0.118 |
+| Constant guess (train win rate) | 0.239 | 0.670 | 0.007 |
+| Oracle (the true generator probability) | 0.166 | 0.504 | 0.046 |
+
+The trained model beats the LLM by 0.038 Brier (95% bootstrap interval +0.012 to +0.065, paired over the same rows). The LLM beats a constant guess, so it does use the facts, but it is overconfident at the low end: where it says about 8%, sellers actually win about 36% of the time. The constant guess has the best ECE because it never varies; ECE alone does not reward telling disputes apart.
+
+Read this with care. The labels come from our own published generator rules (`ml/generator_rules.yaml`), so the benchmark tests calibration on known structure, not how PayPal really decides. The rules summary given to the LLM was written from general public knowledge and still shares the direction of a few effects (the 10-day deadline, stricter chargebacks) with the generator. One model, one prompt and one run: do not read it as a ranking of LLM vendors.
