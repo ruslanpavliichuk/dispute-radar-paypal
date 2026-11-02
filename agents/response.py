@@ -148,7 +148,7 @@ def _fail(engine, event: dict, exc: Exception) -> None:
         values["processed_at"] = datetime.now(timezone.utc)
     with engine.begin() as conn:
         conn.execute(update(webhook_events).where(webhook_events.c.event_id == event["event_id"]).values(**values))
-    logger.error("dispute event attempt %d failed: %s", attempts, type(exc).__name__)
+    logger.error("event attempt %d failed: %s", attempts, type(exc).__name__)
 
 
 def _propose(engine, models, event: dict, dispute: dict) -> None:

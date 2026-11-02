@@ -388,3 +388,12 @@ def test_decide_compares_before_rounding():
     # fight 6999.6p vs offer 7000.0p: both print as 7000 but offer is the better one
     out = decide(0.69996, 10000, "INQUIRY", 0, 30)
     assert out["ev"]["offer"] == 7000 and out["action"] == "offer"
+
+
+async def test_events_backing_off_do_not_crowd_out_due_ones(engine):
+    for i in range(runner.BATCH + 2):  # more waiting events than one batch, all just failed once
+        add_event(engine, event_id=f"WH-W{i}")
+        with engine.begin() as conn:
+            conn.execute(webhook_events.update().where(webhook_events.c.event_id == f"WH-W{i}").values(attempts=1))
+    add_event(engine, event_id="WH-DUE")  # received later, no failures yet: due now
+    assert [e["event_id"] for e in runner._pending(engine)] == ["WH-DUE"]

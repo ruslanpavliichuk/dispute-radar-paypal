@@ -13,3 +13,10 @@ def in_memory_db(monkeypatch):
 def no_agent_loop(monkeypatch):
     # the lifespan would start the response-agent loop; agent tests call run_once directly
     monkeypatch.setattr(settings, "agent_enabled", False)
+
+
+@pytest.fixture(autouse=True)
+def fresh_reconcile_clock(monkeypatch):
+    # run_once throttles the PENDING backstop; every test starts as if it had not run yet
+    from agents import runner
+    monkeypatch.setattr(runner, "_last_reconcile", float("-inf"))
