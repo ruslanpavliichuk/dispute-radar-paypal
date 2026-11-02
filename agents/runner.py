@@ -7,9 +7,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from agents.reconcile import aware, handle_capture_event, reconcile_pending
+from agents.prevention import handle_tracking_event
 from agents.response import handle
 from api.config import settings
-from api.db import webhook_events
+from api.db import tracking_events, webhook_events
 from api.orders_admin import attention_count
 from api.webhooks import CAPTURE_EVENTS
 
@@ -29,10 +30,23 @@ def _pending(engine, types=("CUSTOMER.DISPUTE.CREATED",)) -> list[dict]:
             .where(webhook_events.c.event_type.in_(types), webhook_events.c.processed_at.is_(None))
             .order_by(webhook_events.c.received_at).limit(BATCH * 5)
         ).mappings()]
+    return _due(rows, "received_at")
+
+
+def _due(rows: list[dict], since: str) -> list[dict]:
     now = datetime.now(timezone.utc)
-    # shortcut: backoff counts from received_at (no last-attempt column), and 10 waiting events could crowd the batch
+    # shortcut: backoff counts from received_at / created_at (no last-attempt column), and 10 waiting events could crowd the batch
     # fetch more than BATCH so events still backing off cannot crowd out the ones that are due
-    return [e for e in rows if now - aware(e["received_at"]) >= timedelta(seconds=BACKOFF_SECONDS * e["attempts"])][:BATCH]
+    return [e for e in rows if now - aware(e[since]) >= timedelta(seconds=BACKOFF_SECONDS * e["attempts"])][:BATCH]
+
+
+def _pending_tracking(engine) -> list[dict]:
+    with engine.connect() as conn:
+        rows = [dict(r) for r in conn.execute(
+            select(tracking_events).where(tracking_events.c.processed_at.is_(None))
+            .order_by(tracking_events.c.occurred_at, tracking_events.c.id).limit(BATCH * 5)
+        ).mappings()]
+    return _due(rows, "created_at")
 
 
 # shortcut: single API instance assumed (two would only cost an extra draft, the proposals unique key blocks a
@@ -41,6 +55,10 @@ async def run_once(engine, models, client) -> None:
     async def capture_events():
         for event in await asyncio.to_thread(_pending, engine, tuple(CAPTURE_EVENTS)):
             await handle_capture_event(engine, client, event)
+
+    async def tracking():
+        for event in await asyncio.to_thread(_pending_tracking, engine):
+            await handle_tracking_event(engine, models, event)
 
     async def backstop():
         global _last_reconcile
@@ -53,7 +71,7 @@ async def run_once(engine, models, client) -> None:
 
     for event in await asyncio.to_thread(_pending, engine):
         await handle(engine, models, client, event)
-    for step in (capture_events, backstop):  # one failing step must not stop the other
+    for step in (capture_events, tracking, backstop):  # one failing step must not stop the others
         try:
             await step()
         except Exception as exc:

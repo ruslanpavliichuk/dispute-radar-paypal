@@ -134,20 +134,20 @@ def draft(evidence: list[dict], claim_type: str, action: str, amount_minor: int 
     return _template(evidence, action, offer), "template"
 
 
-def _stamp(engine, event_id: str, error: str | None = None) -> None:
+def _stamp(engine, event_id, error: str | None = None, table=webhook_events, key: str = "event_id") -> None:
     values = {"processed_at": datetime.now(timezone.utc), "last_error": error}  # success clears an earlier attempt's error
     with engine.begin() as conn:
-        conn.execute(update(webhook_events).where(webhook_events.c.event_id == event_id).values(**values))
+        conn.execute(update(table).where(table.c[key] == event_id).values(**values))
 
 
-def _fail(engine, event: dict, exc: Exception) -> None:
+def _fail(engine, event: dict, exc: Exception, table=webhook_events, key: str = "event_id") -> None:
     """Transient failure: count it, keep only the exception type, give up after MAX_ATTEMPTS."""
     attempts = event["attempts"] + 1
     values = {"attempts": attempts, "last_error": type(exc).__name__}
     if attempts >= MAX_ATTEMPTS:
         values["processed_at"] = datetime.now(timezone.utc)
     with engine.begin() as conn:
-        conn.execute(update(webhook_events).where(webhook_events.c.event_id == event["event_id"]).values(**values))
+        conn.execute(update(table).where(table.c[key] == event[key]).values(**values))
     logger.error("event attempt %d failed: %s", attempts, type(exc).__name__)
 
 

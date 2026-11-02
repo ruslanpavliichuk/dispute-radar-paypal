@@ -63,7 +63,7 @@ proposals = Table(
     Column("subject_id", Text, nullable=False),
     Column("source_event_id", Text),
     Column("status", Text, nullable=False, server_default="PROPOSED"),
-    Column("action", Text, nullable=False),  # provide_evidence | send_message | make_offer | accept_claim
+    Column("action", Text, nullable=False),  # provide_evidence | send_message | make_offer | accept_claim | upload_tracking | goodwill_refund
     Column("amount_minor", Integer),
     Column("currency", CHAR(3)),
     Column("claim_type", Text),
@@ -81,6 +81,24 @@ proposals = Table(
     Column("sent_at", DateTime(timezone=True)),
     Column("error", Text),
     UniqueConstraint("agent", "subject_id"),
+)
+
+# Shipment progress for an order, written by scripts/simulate_tracking.py (no public endpoint). The prevention
+# agent re-scores the order on each row. kind: accepted | in_transit | stuck_at_depot | out_for_delivery | delivered.
+# processed_at / attempts / last_error work as on webhook_events.
+tracking_events = Table(
+    "tracking_events",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("paypal_order_id", Text, nullable=False, index=True),
+    Column("kind", Text, nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    Column("tracking_number", Text),
+    Column("carrier", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("processed_at", DateTime(timezone=True)),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("last_error", Text),
 )
 
 

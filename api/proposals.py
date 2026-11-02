@@ -65,7 +65,7 @@ def _one(engine, proposal_id: int) -> dict:
 def _public(row) -> dict:
     # features and claim_source stay internal; the table holds no buyer text
     return {k: row[k] for k in (
-        "id", "subject_id", "status", "action", "amount_minor", "currency", "claim_type", "win_prob",
+        "id", "agent", "subject_id", "status", "action", "amount_minor", "currency", "claim_type", "win_prob",
         "ev", "defaulted", "reasons", "evidence", "draft", "draft_source", "created_at", "decided_at",
         "sent_at", "error")}
 
@@ -126,6 +126,9 @@ def _body(action: str, row, text: str, dispute: dict) -> dict:
 async def approve(proposal_id: int, request: Request, body: Approve | None = None):
     engine = request.app.state.engine
     client: PayPalClient = request.app.state.paypal_client
+    # stage 3 adds the prevention actions; until then refuse before the claim so nothing changes state
+    if (await run_in_threadpool(_one, engine, proposal_id))["agent"] != "response":
+        raise HTTPException(status_code=409, detail="this proposal type cannot be sent yet")
     # the seller-approval gate: nothing below runs unless this claim succeeded
     if not await run_in_threadpool(_move, engine, proposal_id, "PROPOSED", "SENDING", decided_at=now()):
         await run_in_threadpool(_one, engine, proposal_id)  # 404 when absent
