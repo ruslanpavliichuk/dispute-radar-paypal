@@ -441,8 +441,8 @@ def test_simulator_main_needs_a_database_url(monkeypatch, capsys):
     assert exc.value.code == 1 and "DATABASE_URL" in capsys.readouterr().err
 
 
-# ---- prevention proposals cannot be approved yet ----
-def test_prevention_proposal_is_listed_but_cannot_be_approved(monkeypatch):
+# ---- prevention proposals: listed, reject works, approve refuses without our order (see test_prevention_approval.py) ----
+def test_prevention_proposal_is_listed_and_refused_without_an_order(monkeypatch):
     monkeypatch.setattr(settings, "paypal_client_id", "client-id")
     monkeypatch.setattr(settings, "paypal_client_secret", "client-secret")
     monkeypatch.setattr(settings, "admin_token", TOKEN)
@@ -453,7 +453,7 @@ def test_prevention_proposal_is_listed_but_cannot_be_approved(monkeypatch):
                 agent="prevention", subject_id="ORD1:upload_tracking", action="upload_tracking", draft="d",
                 created_at=C)).inserted_primary_key[0]
         r = c.post(f"/api/proposals/{pid}/approve", headers=auth)
-        assert r.status_code == 409 and r.json()["detail"] == "this proposal type cannot be sent yet"
+        assert r.status_code == 409 and r.json()["detail"] == "the order is not a completed, captured payment"
         assert c.get(f"/api/proposals/{pid}", headers=auth).json()["status"] == "PROPOSED"
         assert c.get("/api/proposals", headers=auth).json()[0]["agent"] == "prevention"
         assert c.post("/api/proposals/999/approve", headers=auth).status_code == 404
