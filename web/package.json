@@ -4,21 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@bryntum/scheduler": "npm:@bryntum/scheduler-trial@^7.3.8",
+    "@bryntum/scheduler-react": "^7.3.8",
     "@paypal/react-paypal-js": "^10.6.0",
     "ag-charts-community": "^14.3.0",
     "ag-charts-react": "^14.3.0",
     "ag-grid-community": "^36.3.0",
     "ag-grid-react": "^36.3.0",
+    "ag-studio": "3.0.0",
+    "ag-studio-react": "3.0.0",
     "next": "16.4.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "ag-studio-react": "3.0.0",
-    "ag-studio": "3.0.0"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

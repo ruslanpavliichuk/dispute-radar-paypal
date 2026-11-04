@@ -72,7 +72,7 @@ def _public(row) -> dict:
     return {k: row[k] for k in (
         "id", "agent", "subject_id", "status", "action", "amount_minor", "currency", "claim_type", "win_prob",
         "ev", "defaulted", "reasons", "evidence", "draft", "draft_source", "created_at", "decided_at",
-        "sent_at", "error")}
+        "sent_at", "error", "opened_at", "due_at")}
 
 
 @router.get("")
