@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AgCharts } from "ag-charts-react";
 import { AllCommunityModule, ModuleRegistry } from "ag-charts-community";
 import type { AgCartesianChartOptions } from "ag-charts-community";
+import { chartTheme } from "../theme";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -24,8 +25,10 @@ const pct = { min: 0, max: 1, label: { formatter: ({ value }: { value: number })
 
 function calibration(title: string, lines: { name: string; pts: Point[] }[]): AgCartesianChartOptions {
   return {
+    theme: chartTheme,
     title: { text: title },
-    series: [diagonal, ...lines.map((l) => ({ type: "line" as const, data: l.pts, xKey: "mean_pred", yKey: "obs_rate", yName: l.name }))],
+    series: [diagonal, ...lines.map((l) => ({ type: "line" as const, data: l.pts, xKey: "mean_pred", yKey: "obs_rate", yName: l.name,
+      tooltip: { renderer: ({ datum }: { datum: Point }) => ({ title: l.name, data: [{ label: "Predicted", value: `${Math.round(datum.mean_pred * 100)}%` }, { label: "Observed", value: `${Math.round(datum.obs_rate * 100)}%` }, { label: "Cases", value: String(datum.n) }] }) } }))],
     axes: { x: { type: "number", position: "bottom", title: { text: "Predicted" }, ...pct }, y: { type: "number", position: "left", title: { text: "Observed" }, ...pct } },
   };
 }
@@ -62,6 +65,7 @@ export default function Evaluation() {
       <header className="mb-6 flex items-center gap-4">
         <h1 className="text-2xl font-bold">Evaluation</h1>
         <a className="text-blue-700 underline" href="/dashboard">Dashboard</a>
+        <a className="text-blue-700 underline" href="/studio">Studio</a>
       </header>
       <p className="mb-6 max-w-3xl text-sm text-neutral-700">
         Every chart is drawn from the saved model cards. Dispute labels come from our own generator rules, so these
@@ -81,19 +85,19 @@ export default function Evaluation() {
           </label>
           <div style={{ height: 320 }}>
             <AgCharts options={{
-              title: { text: "Precision and recall by threshold" }, data: stageRows,
+              theme: chartTheme, title: { text: "Precision and recall by threshold" }, data: stageRows,
               series: [{ type: "line", xKey: "threshold", yKey: "precision", yName: "Precision" }, { type: "line", xKey: "threshold", yKey: "recall", yName: "Recall" }],
               axes: { x: { type: "number", position: "bottom", title: { text: "Risk threshold" } }, y: { type: "number", position: "left", ...pct } },
             }} />
           </div>
         </section>
         <Card options={{
-          title: { text: `LLM benchmark: Brier score, lower is better (${d.benchmark.n} disputes)` }, data: bench,
+          theme: chartTheme, title: { text: `LLM benchmark: Brier score, lower is better (${d.benchmark.n} disputes)` }, data: bench,
           series: [{ type: "bar", xKey: "name", yKey: "brier", yName: "Brier" }],
         }}
           note={`Model beats the LLM by ${diff.mean.toFixed(3)} Brier (95% interval ${diff.ci95[0].toFixed(3)} to ${diff.ci95[1].toFixed(3)}). One provider, one prompt, one run. ${d.benchmark.caveat}`} />
         <Card options={{
-          title: { text: `Fight vs offer: value kept on a ${d.decision.value.toFixed(0)} dispute` }, data: d.decision.curve,
+          theme: chartTheme, title: { text: `Fight vs offer: value kept on a ${d.decision.value.toFixed(0)} dispute` }, data: d.decision.curve,
           series: ["fight", "offer", "accept"].map((k) => ({ type: "line" as const, xKey: "p", yKey: k, yName: k, marker: { enabled: false } })),
           axes: { x: { type: "number", position: "bottom", title: { text: "Chance of winning" }, ...pct }, y: { type: "number", position: "left", title: { text: "Expected value" } } },
         }}

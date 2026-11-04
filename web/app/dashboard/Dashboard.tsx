@@ -1,11 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type ICellRendererParams } from "ag-grid-community";
+import { AllCommunityModule, ModuleRegistry, type ColDef, type GridApi, type ICellRendererParams } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
+import { AgCharts } from "ag-charts-react";
+import { AllCommunityModule as ChartsModule, ModuleRegistry as ChartsRegistry } from "ag-charts-community";
 import { api, getToken, gbp, tokenKey } from "../lib";
+import { brand, chartTheme, gridTheme, STATUS_COLOURS } from "../theme";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
+ChartsRegistry.registerModules([ChartsModule]);
 
 type Reason = { feature?: string; text?: string; value?: unknown; contribution: number };
 type Proposal = {
@@ -33,6 +37,10 @@ function ScoreBar({ value, bad }: { value: number | null; bad: boolean }) {
   );
 }
 
+function StatusBadge({ value }: { value: string }) {
+  return <span className="rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ background: STATUS_COLOURS[value] ?? "#6b7280" }}>{value}</span>;
+}
+
 const reasonText = (r: Reason) => `${r.feature ?? r.text} ${r.contribution >= 0 ? "+" : ""}${r.contribution.toFixed(2)}`;
 const topReasons = (p: Proposal) => (p.reasons ?? []).slice(0, 2).map(reasonText).join(", ");
 
@@ -40,17 +48,44 @@ function cols(kind: "prevention" | "response"): ColDef<Proposal>[] {
   const risk = kind === "prevention";
   return [
     { field: "subject_id", headerName: risk ? "Order" : "Dispute", minWidth: 150 },
-    { field: "status", width: 110 },
+    { field: "status", width: 120, cellRenderer: (p: ICellRendererParams<Proposal>) => <StatusBadge value={p.value} />, filter: true },
     { field: "action", width: 150 },
-    { headerName: risk ? "Dispute risk" : "Win chance", width: 150, valueGetter: (p) => (p.data ? score(p.data) : null),
+    { headerName: risk ? "Dispute risk" : "Win chance", width: 150, valueGetter: (p) => (p.data ? score(p.data) : null), filter: "agNumberColumnFilter", sort: "desc" as const,
+      tooltipValueGetter: (p) => (p.data?.reasons ?? []).map(reasonText).join("\n") || "No reasons stored",
       cellRenderer: (p: ICellRendererParams<Proposal>) => <ScoreBar value={p.value} bad={risk} /> },
-    { headerName: "Why (SHAP)", flex: 1, minWidth: 200, valueGetter: (p) => (p.data ? topReasons(p.data) : "") },
+    { headerName: "Why (SHAP)", flex: 1, minWidth: 200, tooltipValueGetter: (p) => (p.data?.reasons ?? []).map(reasonText).join("\n"), valueGetter: (p) => (p.data ? topReasons(p.data) : "") },
     { headerName: "Amount", width: 110, valueGetter: (p) => gbp(p.data?.amount_minor ?? null, p.data?.currency ?? "GBP") },
     { field: "created_at", headerName: "Created", width: 170, valueFormatter: (p) => new Date(p.value).toLocaleString() },
   ];
 }
 
-const theme = themeQuartz;
+const STATE_KEY = "dr_grid_state";
+const saveState = (kind: string, api: GridApi) => { try { localStorage.setItem(`${STATE_KEY}_${kind}`, JSON.stringify(api.getColumnState())); } catch {} };
+const restoreState = (kind: string, api: GridApi) => {
+  try { const raw = localStorage.getItem(`${STATE_KEY}_${kind}`); if (raw) api.applyColumnState({ state: JSON.parse(raw), applyOrder: true }); } catch {}
+};
+
+function Tile({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-xl border bg-white px-4 py-3 shadow-sm">
+      <div className="text-xs uppercase tracking-wide text-neutral-500">{label}</div>
+      <div className="text-2xl font-bold tabular-nums" style={{ color: tone ?? brand.ink }}>{value}</div>
+    </div>
+  );
+}
+
+// the drawer chart: what each choice keeps, so the seller sees why the agent leans one way
+function EvChart({ p }: { p: Proposal }) {
+  if (p.agent !== "response" || !p.ev) return null;
+  const cur = p.currency ?? "GBP";
+  const data = (["fight", "offer", "accept"] as const).map((k) => ({ action: k, kept: (p.ev?.[k] ?? 0) / 100 }));
+  return (
+    <div style={{ height: 180 }} className="mt-2">
+      <AgCharts options={{ theme: chartTheme, data, legend: { enabled: false }, title: { text: "Value kept per choice" },
+        series: [{ type: "bar", xKey: "action", yKey: "kept", tooltip: { renderer: ({ datum }) => ({ title: String(datum.action), data: [{ label: "Kept", value: gbp(Math.round(datum.kept * 100), cur) }] }) } }] }} />
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [token, setToken] = useState("");
@@ -60,6 +95,8 @@ export default function Dashboard() {
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [quick, setQuick] = useState("");
+  const [onlyPending, setOnlyPending] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -91,11 +128,16 @@ export default function Dashboard() {
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   };
 
+  const shown = (kind: "prevention" | "response") => rows.filter((r) => r.agent === kind && (!onlyPending || r.status === "PROPOSED"));
+  const pending = rows.filter((r) => r.status === "PROPOSED");
+  const atRisk = pending.filter((r) => r.agent === "prevention").reduce((t, r) => t + (r.ev?.expected_loss_minor ?? 0), 0);
+
   const grid = (kind: "prevention" | "response", title: string) => (
     <section className="mb-8">
       <h2 className="mb-2 text-lg font-semibold">{title}</h2>
       <div style={{ height: 280 }}>
-        <AgGridReact<Proposal> theme={theme} rowData={rows.filter((r) => r.agent === kind)} columnDefs={cols(kind)}
+        <AgGridReact<Proposal> theme={gridTheme} rowData={shown(kind)} columnDefs={cols(kind)} quickFilterText={quick} tooltipShowDelay={300}
+          onGridReady={(e) => restoreState(kind, e.api)} onColumnMoved={(e) => saveState(kind, e.api)} onColumnResized={(e) => e.finished && saveState(kind, e.api)} onSortChanged={(e) => saveState(kind, e.api)}
           getRowId={(p) => String(p.data.id)} rowSelection={{ mode: "singleRow", checkboxes: false, enableClickSelection: true }}
           onRowClicked={(e) => e.data && select(e.data)} overlayNoRowsTemplate="Nothing proposed yet" />
       </div>
@@ -107,6 +149,7 @@ export default function Dashboard() {
       <header className="mb-6 flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-bold">Seller dashboard</h1>
         <a className="text-blue-700 underline" href="/evaluation">Evaluation</a>
+        <a className="text-blue-700 underline" href="/studio">Studio</a>
         <form className="ml-auto flex gap-2" onSubmit={(e) => { e.preventDefault(); try { sessionStorage.setItem(tokenKey, (new FormData(e.currentTarget).get("t") as string) ?? ""); } catch {} setToken(getToken()); }}>
           <input name="t" type="password" placeholder="Admin token" aria-label="Admin token" className="rounded border px-2 py-1" />
           <button className="rounded bg-neutral-900 px-3 py-1 text-white">Unlock</button>
@@ -115,12 +158,22 @@ export default function Dashboard() {
       {!token ? <p>Enter the admin token to see proposals.</p> : (
         <>
           {msg && !open && <p role="alert" className="mb-3 text-red-700">{msg}</p>}
+          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Tile label="Waiting for you" value={String(pending.length)} tone={pending.length ? brand.amber : undefined} />
+            <Tile label="Expected loss at stake" value={gbp(atRisk)} tone={atRisk ? brand.red : undefined} />
+            <Tile label="Sent" value={String(rows.filter((r) => r.status === "SENT").length)} tone={brand.green} />
+            <Tile label="Orders needing attention" value={String(attention.length)} tone={attention.length ? brand.red : undefined} />
+          </div>
+          <div className="mb-4 flex flex-wrap items-center gap-4">
+            <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Search proposals…" aria-label="Search proposals" className="rounded border px-3 py-1.5" />
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} /> Needs my approval only</label>
+          </div>
           {grid("prevention", "Orders: prevention proposals")}
           {grid("response", "Disputes: response proposals")}
           <section>
             <h2 className="mb-2 text-lg font-semibold">Orders needing attention</h2>
             <div style={{ height: 200 }}>
-              <AgGridReact<Attention> theme={theme} rowData={attention} overlayNoRowsTemplate="None"
+              <AgGridReact<Attention> theme={gridTheme} rowData={attention} overlayNoRowsTemplate="None"
                 columnDefs={[{ field: "paypal_order_id", headerName: "Order", flex: 1 }, { field: "status" },
                   { headerName: "Amount", valueGetter: (p) => gbp(p.data?.amount_minor ?? null, p.data?.currency) },
                   { field: "created_at", headerName: "Created", valueFormatter: (p) => new Date(p.value).toLocaleString() }]} />
@@ -137,6 +190,7 @@ export default function Dashboard() {
           {open.ev && <p className="mt-2 text-sm">{open.agent === "prevention"
             ? `Expected loss if nothing is done: ${gbp(open.ev.expected_loss_minor, open.currency ?? "GBP")}`
             : `Expected value: fight ${gbp(open.ev.fight, open.currency ?? "GBP")} · offer ${gbp(open.ev.offer, open.currency ?? "GBP")} · accept ${gbp(open.ev.accept, open.currency ?? "GBP")}`}</p>}
+          <EvChart p={open} />
           <h3 className="mt-4 font-medium">Why</h3>
           <ul className="list-disc pl-5 text-sm">{(open.reasons ?? []).map((r, i) => <li key={i}>{reasonText(r)}</li>)}</ul>
           {!!open.defaulted?.length && <p className="mt-2 text-sm text-amber-700">Guessed (no data): {open.defaulted.join(", ")}</p>}

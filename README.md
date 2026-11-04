@@ -171,3 +171,7 @@ Result with Gemini (`gemini-3.1-flash-lite`, free tier), 300 of 300 rows scored,
 The trained model beats the LLM by 0.038 Brier (95% bootstrap interval +0.012 to +0.065, paired over the same rows). The LLM beats a constant guess, so it does use the facts, but it is overconfident at the low end: where it says about 8%, sellers actually win about 36% of the time. The constant guess has the best ECE because it never varies; ECE alone does not reward telling disputes apart.
 
 Read this with care. The labels come from our own published generator rules (`ml/generator_rules.yaml`), so the benchmark tests calibration on known structure, not how PayPal really decides. The rules summary given to the LLM was written from general public knowledge and still shares the direction of a few effects (the 10-day deadline, stricter chargebacks) with the generator. One model, one prompt and one run: do not read it as a ranking of LLM vendors.
+
+## Seller dashboard, evaluation and AG Studio
+
+`web/` has three pages next to the shop: `/dashboard` (AG Grid queues of proposals, approve or reject from a drawer, needs the `ADMIN_TOKEN`), `/evaluation` (AG Charts drawn from the saved model cards and benchmark file) and `/studio` (AG Studio over the same data, with a small "Radar" agent that answers from the proposals table and cannot change anything). `/studio` needs `NEXT_PUBLIC_AG_STUDIO_LICENSE` in `web/.env.local`; it is an evaluation key, valid until 19 December 2026.

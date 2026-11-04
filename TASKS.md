@@ -119,8 +119,9 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Writes `ml/artifacts/benchmark.json` + `ml/artifacts/benchmark_calibration.png`; one entry per provider and model
   - [x] Done when: JSON + plot exist, README has results table
   - Result (Gemini `gemini-3.1-flash-lite`, 300 of 300 scored): Brier model 0.169, LLM 0.207, constant 0.239, oracle 0.166; log loss 0.516 / 0.621 / 0.670 / 0.504. LLM minus model Brier +0.038 (95% CI +0.012 to +0.065). The LLM is overconfident at the low end (says about 8%, sellers win about 36%). Labels come from our generator, so this is calibration on known structure. Only one provider has been run (the only key available); other providers can be added by rerunning with a different `LLM_PROVIDER`/`LLM_MODEL`. ML review fixes: cache key includes the model, percent-style answers rescaled, the same clip on every predictor, uniform-bin ECE next to equal-count ECE. 416 tests.
-- [ ] **T14** AG Grid dashboard + Evaluation page (3h, two sessions)
-  - [ ] Orders queue + disputes queue in AG Grid, risk-score cell renderers, SHAP reasons, approval drawer
+- [x] **T14** AG Grid dashboard + Evaluation page (3h, two sessions)
+  - Built: `/dashboard` (themed grids, status badges, SHAP tooltips, tiles, search, saved columns, approval drawer with a value-kept chart), `/evaluation` (AG Charts from the model cards), `/studio` (AG Studio over the proposals and calibration tables, with a custom Radar agent that reads the proposals in the browser; no LLM, no PayPal calls). Not browser-tested yet; dark mode and Grid Enterprise features skipped.
+  - [x] Orders queue + disputes queue in AG Grid, risk-score cell renderers, SHAP reasons, approval drawer
   - [ ] Evaluation page: AG Charts calibration curves, precision/recall, LLM benchmark, fight-vs-offer chart
   - Done when: seller can approve a proposal from the grid, every chart reads from model cards
 - [ ] **T15** Bryntum timeline (2h)
