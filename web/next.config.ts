@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
         source: "/api/shop/orders/:id/capture",
         destination: `${api}/api/shop/orders/:id/capture`,
       },
+      // seller dashboard: the browser sends X-Admin-Token itself, nothing secret lives in web/
+      { source: "/api/proposals", destination: `${api}/api/proposals` },
+      { source: "/api/proposals/:id/approve", destination: `${api}/api/proposals/:id/approve` },
+      { source: "/api/proposals/:id/reject", destination: `${api}/api/proposals/:id/reject` },
+      { source: "/api/orders/attention", destination: `${api}/api/orders/attention` },
+      { source: "/api/evaluation", destination: `${api}/api/evaluation` },
     ];
   },
   async headers() {

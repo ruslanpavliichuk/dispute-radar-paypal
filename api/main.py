@@ -9,6 +9,7 @@ from paypalserversdk.paypal_serversdk_client import PaypalServersdkClient
 from agents.runner import loop
 from api.config import require_settings, settings
 from api.db import init_db, make_engine
+from api.evaluation import router as evaluation_router
 from api.orders_admin import router as orders_admin_router
 from api.paypal_client import PayPalClient
 from api.proposals import router as proposals_router
@@ -63,6 +64,7 @@ app.include_router(shop_router)
 app.include_router(proposals_router)
 app.include_router(orders_admin_router)
 app.include_router(scoring_router)
+app.include_router(evaluation_router)
 
 
 @app.get("/health")
