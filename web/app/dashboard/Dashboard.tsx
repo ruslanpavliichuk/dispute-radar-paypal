@@ -150,6 +150,7 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold">Seller dashboard</h1>
         <a className="text-blue-700 underline" href="/evaluation">Evaluation</a>
         <a className="text-blue-700 underline" href="/studio">Studio</a>
+        <a className="text-blue-700 underline" href="/timeline">Timeline</a>
         <form className="ml-auto flex gap-2" onSubmit={(e) => { e.preventDefault(); try { sessionStorage.setItem(tokenKey, (new FormData(e.currentTarget).get("t") as string) ?? ""); } catch {} setToken(getToken()); }}>
           <input name="t" type="password" placeholder="Admin token" aria-label="Admin token" className="rounded border px-2 py-1" />
           <button className="rounded bg-neutral-900 px-3 py-1 text-white">Unlock</button>

@@ -80,6 +80,8 @@ proposals = Table(
     Column("decided_at", DateTime(timezone=True)),
     Column("sent_at", DateTime(timezone=True)),
     Column("error", Text),
+    Column("opened_at", DateTime(timezone=True)),  # response agent: PayPal create_time of the dispute
+    Column("due_at", DateTime(timezone=True)),  # response agent: seller_response_due_date
     UniqueConstraint("agent", "subject_id"),
 )
 
@@ -124,6 +126,8 @@ def init_db(engine: Engine) -> None:
                 "ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0"
             ))
             conn.execute(text("ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS last_error TEXT"))
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ"))
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ"))
             # rows from before this column are not waiting for the agent; only dispute-created events ever are
             conn.execute(text(
                 "UPDATE webhook_events SET processed_at = received_at "

@@ -151,6 +151,13 @@ def _fail(engine, event: dict, exc: Exception, table=webhook_events, key: str = 
     logger.error("event attempt %d failed: %s", attempts, type(exc).__name__)
 
 
+def _when(dispute: dict, key: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(dispute[key])
+    except (KeyError, TypeError, ValueError):
+        return None  # the timeline just shows no bar for this dispute
+
+
 def _propose(engine, models, event: dict, dispute: dict) -> None:
     order = linked_order(engine, dispute)
     if order is None:
@@ -175,6 +182,7 @@ def _propose(engine, models, event: dict, dispute: dict) -> None:
                 claim_type=claim_type, claim_source=claim_source, features=features, defaulted=defaulted,
                 win_prob=scored.score, reasons=[r.model_dump() for r in scored.reasons], ev=decision["ev"],
                 evidence=evidence, draft=note, draft_source=source, created_at=datetime.now(timezone.utc),
+                opened_at=_when(dispute, "create_time"), due_at=_when(dispute, "seller_response_due_date"),
             ))
     except IntegrityError:
         with engine.connect() as conn:  # only the unique key means "already proposed"; anything else is a real failure

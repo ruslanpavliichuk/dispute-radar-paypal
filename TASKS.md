@@ -124,8 +124,9 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
   - [x] Orders queue + disputes queue in AG Grid, risk-score cell renderers, SHAP reasons, approval drawer
   - [ ] Evaluation page: AG Charts calibration curves, precision/recall, LLM benchmark, fight-vs-offer chart
   - Done when: seller can approve a proposal from the grid, every chart reads from model cards
-- [ ] **T15** Bryntum timeline (2h)
-  - [ ] Bryntum Scheduler: dispute opened → response-due date, agent actions as events
+- [x] **T15** Bryntum timeline (2h)
+  - Built: `/timeline` (read-only Bryntum Scheduler trial package from the same `/api/proposals`; one row per dispute or order, a bar from opened to response-due, red once overdue, points for proposed/approved/sent). Proposals now store `opened_at` and `due_at` for disputes opened after this change. Not browser-tested; the production build uses `--webpack` because Turbopack was killed building the Bryntum bundle.
+  - [x] Bryntum Scheduler: dispute opened → response-due date, agent actions as events
   - Done when: timeline renders live data from the API
 
 ## Week 4 — Ship (Oct 31–Nov 6, 10h)

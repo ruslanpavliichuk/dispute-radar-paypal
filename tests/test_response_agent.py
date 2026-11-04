@@ -262,6 +262,7 @@ async def test_run_once_makes_exactly_one_proposal(engine, models, paypal):
     assert 0 <= p["win_prob"] <= 1 and len(p["reasons"]) == 3 and set(p["ev"]) == {"fight", "offer", "accept"}
     assert "tracking_uploaded" in p["defaulted"] and p["decided_at"] is None and p["sent_at"] is None
     assert event_row(engine)["processed_at"] is not None and event_row(engine)["last_error"] is None
+    assert p["opened_at"] is not None and p["due_at"] is None  # this fixture has no due date; the timeline then draws no bar
     # the agent only reads: the token call and the GET are the only requests
     assert [c.request.method for c in paypal.calls] == ["POST", "GET"]
 
@@ -397,3 +398,9 @@ async def test_events_backing_off_do_not_crowd_out_due_ones(engine):
             conn.execute(webhook_events.update().where(webhook_events.c.event_id == f"WH-W{i}").values(attempts=1))
     add_event(engine, event_id="WH-DUE")  # received later, no failures yet: due now
     assert [e["event_id"] for e in runner._pending(engine)] == ["WH-DUE"]
+
+
+def test_when_reads_paypal_dates_and_tolerates_gaps():
+    actionable = fixture("not_received_actionable")
+    assert response._when(actionable, "seller_response_due_date") > response._when(actionable, "create_time")
+    assert response._when({}, "create_time") is None and response._when({"create_time": "soon"}, "create_time") is None
