@@ -1,0 +1,12 @@
+.git
+.env
+.venv
+**/__pycache__
+web
+node_modules
+tests
+mlruns
+mlflow.db
+ml/data/raw
+ml/data/processed
+ml/artifacts/benchmark

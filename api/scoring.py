@@ -4,15 +4,16 @@ import logging
 from typing import Literal
 
 import pandas as pd
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.proposals import require_admin
 from ml.claim_model import ClaimClassifier
 from ml.outcome_model import OutcomeModel
 from ml.risk_model import RiskModel
 
 logger = logging.getLogger("dispute_radar.scoring")
-router = APIRouter(prefix="/score", tags=["score"])
+router = APIRouter(prefix="/score", tags=["score"], dependencies=[Depends(require_admin)])  # CPU-bound and not used by the browser
 Nonneg = Field(ge=0, le=1e7)
 Days = Field(ge=-1000, le=1000)
 
