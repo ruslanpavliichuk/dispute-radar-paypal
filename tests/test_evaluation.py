@@ -14,3 +14,12 @@ def test_evaluation_reads_the_model_cards(monkeypatch):
     assert body["benchmark"]["runs"]
     curve = body["decision"]["curve"]
     assert curve[0]["action"] == "offer" and curve[-1]["action"] == "fight"  # sure loss: offer; sure win: fight
+
+
+def test_database_url_gets_tls_and_the_psycopg_driver_unless_local():
+    from sqlalchemy.engine import make_url
+    from api.db import make_engine, tls_args
+    assert make_engine("postgres://u:p@db.example.com/x").url.drivername == "postgresql+psycopg"
+    assert tls_args(make_url("postgresql://u:p@db.example.com/x")) == {"sslmode": "require"}
+    assert tls_args(make_url("postgresql+psycopg://u:p@localhost/x")) == {}
+    assert tls_args(make_url("postgresql://u:p@db.example.com/x?sslmode=verify-full")) == {}  # the URL's own choice wins

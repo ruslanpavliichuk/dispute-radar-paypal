@@ -22,9 +22,10 @@ def client():
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(settings, "database_url", "sqlite://")
         mp.setattr(settings, "agent_enabled", False)
+        mp.setattr(settings, "admin_token", "t0ken")
         mp.setattr(settings, "paypal_client_id", "id")  # lifespan checks these but never calls PayPal at startup
         mp.setattr(settings, "paypal_client_secret", "secret")
-        with TestClient(app) as c:
+        with TestClient(app, headers={"X-Admin-Token": "t0ken"}) as c:
             yield c
 
 
@@ -73,3 +74,8 @@ def test_every_endpoint_answers_under_300ms(client):
         t = time.perf_counter()
         client.post(path, json=body)
         assert time.perf_counter() - t < 0.3, path
+
+
+def test_score_endpoints_need_the_admin_token(client):
+    assert client.post("/score/risk", json=RISK, headers={"X-Admin-Token": "wrong"}).status_code == 401
+    assert client.post("/score/risk", json=RISK, headers={"X-Admin-Token": ""}).status_code == 401

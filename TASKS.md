@@ -132,7 +132,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ## Week 4 — Ship (Oct 31–Nov 6, 10h)
 
 - [ ] **T16** Render deploy (2h)
-  - [ ] Before real users: per-order secret returned by create and required on capture, `sslmode=require` on the managed DB, no permissive CORS (deferred from T02 review)
+  - Built, not deployed: `Dockerfile`, `render.yaml` (api, web, Postgres; no separate worker, the agents run inside the API process so it stays at one instance), per-order capture secret, TLS for remote databases, `/score/*` behind the admin token, `scripts/seed_demo.py`. Waiting on: Blueprint created in Render, secrets filled in, production webhook registered, first live run.
+  - [x] Before real users: per-order secret returned by create and required on capture, `sslmode=require` on the managed DB, no permissive CORS (deferred from T02 review)
   - [ ] `render.yaml`: web, api, worker, Postgres
   - [ ] Register production webhook URL, seed data for first-time visitor
   - Done when: hosted URL runs the full demo

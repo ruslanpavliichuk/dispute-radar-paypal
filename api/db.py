@@ -13,6 +13,7 @@ from sqlalchemy import (
     create_engine,
     text,
 )
+from sqlalchemy.engine import make_url
 from sqlalchemy.pool import StaticPool
 
 metadata = MetaData()
@@ -31,6 +32,7 @@ orders = Table(
     Column("payer_id", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("captured_at", DateTime(timezone=True)),
+    Column("capture_secret_hash", Text),  # sha256 of the secret handed to the buyer's browser at create time
 )
 
 
@@ -104,13 +106,21 @@ tracking_events = Table(
 )
 
 
+def tls_args(u) -> dict:
+    """Managed databases are reached over the network: require TLS unless the URL is local or already says otherwise."""
+    return {} if u.host in (None, "", "localhost", "127.0.0.1", "::1") or "sslmode" in u.query else {"sslmode": "require"}
+
+
 def make_engine(url: str) -> Engine:
     if url.startswith("sqlite"):
         # in-memory SQLite for tests: one shared connection across the threadpool
         return create_engine(
             url, poolclass=StaticPool, connect_args={"check_same_thread": False}
         )
-    return create_engine(url, pool_pre_ping=True)
+    u = make_url(url)
+    if u.drivername in ("postgres", "postgresql"):  # Render hands out postgres://; we use the psycopg 3 driver
+        u = u.set(drivername="postgresql+psycopg")
+    return create_engine(u, pool_pre_ping=True, connect_args=tls_args(u))
 
 
 def init_db(engine: Engine) -> None:
@@ -126,6 +136,7 @@ def init_db(engine: Engine) -> None:
                 "ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0"
             ))
             conn.execute(text("ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS last_error TEXT"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS capture_secret_hash TEXT"))
             conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ"))
             conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ"))
             # rows from before this column are not waiting for the agent; only dispute-created events ever are

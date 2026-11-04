@@ -458,3 +458,14 @@ def test_prevention_proposal_is_listed_and_refused_without_an_order(monkeypatch)
         assert c.get("/api/proposals", headers=auth).json()[0]["agent"] == "prevention"
         assert c.post("/api/proposals/999/approve", headers=auth).status_code == 404
         assert c.post(f"/api/proposals/{pid}/reject", headers=auth).json()["status"] == "REJECTED"
+
+
+def test_demo_seed_is_idempotent_and_makes_completed_orders_with_events():
+    from api.db import init_db, make_engine, tracking_events
+    from scripts.seed_demo import DEMO, seed
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    assert len(seed(engine)) == len(DEMO) and seed(engine) == []
+    with engine.connect() as conn:
+        assert {r["status"] for r in conn.execute(select(orders)).mappings()} == {"COMPLETED"}
+        assert len(conn.execute(select(tracking_events)).all()) == sum(len(s) for _, _, s in DEMO)

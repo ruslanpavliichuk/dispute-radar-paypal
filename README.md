@@ -175,3 +175,14 @@ Read this with care. The labels come from our own published generator rules (`ml
 ## Seller dashboard, evaluation and AG Studio
 
 `web/` has three pages next to the shop: `/dashboard` (AG Grid queues of proposals, approve or reject from a drawer, needs the `ADMIN_TOKEN`), `/evaluation` (AG Charts drawn from the saved model cards and benchmark file) `/timeline` (Bryntum Scheduler: each dispute from opened to response-due, with the agent's steps as points on the row) and `/studio` (AG Studio over the same data, with a small "Radar" agent that answers from the proposals table and cannot change anything). `/studio` needs `NEXT_PUBLIC_AG_STUDIO_LICENSE` in `web/.env.local`; it is an evaluation key, valid until 19 December 2026.
+
+## Deploy on Render
+
+`render.yaml` describes the whole stack: a Postgres database, the API (Docker, with the agents running inside it, so keep one instance) and the Next.js web app. The browser only talks to the web service; it forwards `/api/*` to the API over Render's private network, so there is no CORS to configure. Databases are reached over TLS (`sslmode=require` for any non-local host).
+
+1. In Render choose **New, Blueprint**, pick this repo, and fill in the secrets it asks for: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` (sandbox only), `GEMINI_API_KEY`, and for the web service `NEXT_PUBLIC_PAYPAL_CLIENT_ID` and `NEXT_PUBLIC_AG_STUDIO_LICENSE`. `ADMIN_TOKEN` is generated for you; read it in the API service's environment tab, it is the dashboard password.
+2. When the API is live, register its webhook in the PayPal developer dashboard (sandbox app, Webhooks): `https://<your-api>.onrender.com/api/webhooks/paypal`, events `CUSTOMER.DISPUTE.*` and `PAYMENT.CAPTURE.*`. Copy the webhook ID into `PAYPAL_WEBHOOK_ID` on the API service and let it redeploy. Until then the route answers 503.
+3. For a first-time visitor, open a shell on the API service and run `python -m scripts.seed_demo`: three labelled demo orders with shipment events, scored by the real model. Demo orders do not exist at PayPal, so approving them fails at the PayPal call; a real purchase in the shop gives a live approval.
+4. The same shell runs `python -m scripts.simulate_tracking` and `python -m scripts.simulate_dispute` for the live demo.
+
+Checkout is protected by a per-order secret: creating an order returns a one-time `capture_secret` that the same browser must send in `X-Capture-Secret` to capture it. `/score/*` needs the admin token too. The plans in `render.yaml` (`standard` for the API and web, `basic-256mb` for Postgres) are a starting point: the API holds three models in memory and the web build bundles four large UI libraries.

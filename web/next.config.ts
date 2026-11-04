@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
   // The browser only talks to this origin; Next forwards shop calls to FastAPI,
   // so no CORS configuration is needed and the PayPal secret never reaches web/.
   async rewrites() {
-    const api = process.env.API_URL ?? "http://127.0.0.1:8000";
+    // API_URL for local overrides; API_HOSTPORT is set by render.yaml (private network, plain http)
+    const api = process.env.API_URL ?? (process.env.API_HOSTPORT ? `http://${process.env.API_HOSTPORT}` : "http://127.0.0.1:8000");
     // explicit routes only, so a future backend route under /api/shop is not exposed by accident
     return [
       { source: "/api/shop/products", destination: `${api}/api/shop/products` },

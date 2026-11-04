@@ -1,10 +1,12 @@
+import hashlib
 import json
 import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi import Path as PathParam
 from paypalserversdk.exceptions.api_exception import ApiException
 from paypalserversdk.models.amount_with_breakdown import AmountWithBreakdown
@@ -96,6 +98,10 @@ def _record(engine, order_id: str, **values) -> bool:
         raise HTTPException(status_code=500, detail="order recorded incorrectly") from None
 
 
+def _digest(secret: str) -> str:
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
 def _stored(row) -> dict:
     if row["status"] in PAID:
         return {"status": row["status"], "capture_id": row["capture_id"]}
@@ -149,10 +155,12 @@ def create_order(body: CreateOrder, request: Request):
         logger.exception("PayPal create_order failed")
         raise HTTPException(status_code=502, detail="could not create order") from None
 
+    capture_secret = secrets.token_urlsafe(24)
     try:
         with request.app.state.engine.begin() as conn:
             conn.execute(
                 insert(orders).values(
+                    capture_secret_hash=_digest(capture_secret),
                     paypal_order_id=order_id,
                     product_id=product["id"],
                     amount_minor=product["price_minor"],
@@ -164,15 +172,24 @@ def create_order(body: CreateOrder, request: Request):
     except SQLAlchemyError:
         logger.critical("PayPal order %s created but DB insert failed", order_id, exc_info=True)
         raise HTTPException(status_code=500, detail="could not save order") from None
-    return {"order_id": order_id}
+    return {"order_id": order_id, "capture_secret": capture_secret}
 
 
 @router.post("/orders/{order_id}/capture")
-def capture_order(request: Request, order_id: str = PathParam(pattern=r"^[A-Z0-9]{1,36}$")):
+def capture_order(
+    request: Request,
+    order_id: str = PathParam(pattern=r"^[A-Z0-9]{1,36}$"),
+    x_capture_secret: str | None = Header(None),
+):
     engine = request.app.state.engine
     row = _fetch(engine, order_id)
     if row is None:
         raise HTTPException(status_code=404, detail="unknown order")
+    # only the browser that created the order holds the secret; rows from before it existed cannot be captured
+    if not (row["capture_secret_hash"] and x_capture_secret) or not secrets.compare_digest(
+        _digest(x_capture_secret), row["capture_secret_hash"]
+    ):
+        raise HTTPException(status_code=403, detail="bad capture secret")
     if row["status"] != "CREATED":
         return _stored(row)
 

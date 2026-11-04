@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PayPalProvider,
   PayPalOneTimePaymentButton,
@@ -28,6 +28,7 @@ function formatPrice(p: Product) {
 export default function Shop() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const secrets = useRef<Record<string, string>>({}); // capture secret per order, kept in memory only
 
   useEffect(() => {
     fetch("/api/shop/products")
@@ -51,13 +52,15 @@ export default function Shop() {
       body: JSON.stringify({ product_id: productId }),
     });
     if (!res.ok) throw new Error(`create order failed: ${res.status}`);
-    const { order_id } = await res.json();
+    const { order_id, capture_secret } = await res.json();
+    secrets.current[order_id as string] = capture_secret as string;
     return { orderId: order_id as string };
   }
 
   async function capture(orderId: string) {
     const res = await fetch(`/api/shop/orders/${encodeURIComponent(orderId)}/capture`, {
       method: "POST",
+      headers: { "X-Capture-Secret": secrets.current[orderId] ?? "" },
     });
     if (!res.ok) throw new Error(`capture failed: ${res.status}`);
     const { status, capture_id } = await res.json();

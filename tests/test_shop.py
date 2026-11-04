@@ -114,12 +114,18 @@ def _row(order_id):
         ).mappings().first()
 
 
+SECRETS = {}
+
+
 def place(shop, product=PRODUCT):
-    return shop.post("/api/shop/orders", json={"product_id": product}).json()["order_id"]
+    body = shop.post("/api/shop/orders", json={"product_id": product}).json()
+    SECRETS[body["order_id"]] = body["capture_secret"]
+    return body["order_id"]
 
 
-def capture(shop, order_id):
-    return shop.post(f"/api/shop/orders/{order_id}/capture")
+def capture(shop, order_id, secret=None):
+    secret = SECRETS.get(order_id, "") if secret is None else secret
+    return shop.post(f"/api/shop/orders/{order_id}/capture", headers={"X-Capture-Secret": secret})
 
 
 @pytest.mark.parametrize("minor,expected", [(0, "0.00"), (5, "0.05"), (1299, "12.99"), (100000, "1000.00")])
@@ -341,3 +347,20 @@ def test_startup_refuses_a_non_sandbox_paypal_base(monkeypatch):
     with pytest.raises(RuntimeError, match="sandbox"):
         with TestClient(app):
             pass
+
+
+def test_capture_needs_the_secret_from_create(shop):
+    order_id = place(shop)
+    for bad in ("", "wrong"):
+        assert capture(shop, order_id, bad).status_code == 403
+    assert shop.post(f"/api/shop/orders/{order_id}/capture").status_code == 403  # header missing
+    assert not shop.fake.captured and shop.row(order_id)["status"] == "CREATED"
+    assert "capture_secret" not in dict(shop.row(order_id)).values()  # only the hash is stored
+    assert capture(shop, order_id).status_code == 200
+
+
+def test_capture_refuses_an_order_without_a_stored_secret(shop):
+    order_id = place(shop)
+    with app.state.engine.begin() as conn:
+        conn.execute(update(orders).where(orders.c.paypal_order_id == order_id).values(capture_secret_hash=None))
+    assert capture(shop, order_id, "anything").status_code == 403
