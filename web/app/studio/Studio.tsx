@@ -61,7 +61,9 @@ export default function Studio() {
         <a className="text-blue-700 underline" href="/evaluation">Evaluation</a>
         <span className="text-sm text-neutral-600">Drag fields onto the canvas, or ask Radar in the assistant panel.</span>
       </header>
-      <div className="min-h-0 flex-1">
+      {/* AG Studio fills its parent, so the parent needs a definite size: absolute inside a relative flex item */}
+      <div className="relative min-h-0 flex-1">
+       <div className="absolute inset-0">
         <AgStudioProvider licenseKey={process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE ?? ""} modules={[AgStudioAiModule]}>
           <AgStudio data={data} mode="edit"
             ai={({ api: studio }) => createAiHarness(studio, () => ({
@@ -69,6 +71,7 @@ export default function Studio() {
               promptStarters: [{ label: "What is waiting?", prompt: "What is waiting for me?" }, { label: "Money at stake", prompt: "How much money is at stake?" }, { label: "Riskiest orders", prompt: "Which orders are riskiest?" }],
             }))} />
         </AgStudioProvider>
+       </div>
       </div>
     </main>
   );

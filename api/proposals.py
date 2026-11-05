@@ -96,6 +96,16 @@ def reject(proposal_id: int, request: Request):
     return _public(_one(engine, proposal_id))
 
 
+def _issue(response) -> str:
+    """PayPal's short error code (like INSUFFICIENT_FUNDS) for the seller; only a strict enum, never free text."""
+    try:
+        body = response.json()
+        code = ((body.get("details") or [{}])[0].get("issue")) or body.get("name")
+    except Exception:
+        return ""
+    return f" {code}" if isinstance(code, str) and re.fullmatch(r"[A-Z0-9_]{1,60}", code) else ""
+
+
 def _body(action: str, row, text: str, dispute: dict) -> dict:
     if action == "accept_claim":
         return {"note": text, "accept_claim_reason": "REASON_NOT_PROVIDED"}
@@ -264,7 +274,7 @@ async def approve(proposal_id: int, request: Request, body: Approve | None = Non
     try:
         response = await client.request(
             "POST", path, json=payload, headers={"PayPal-Request-Id": f"proposal-{proposal_id}"})
-        failure = None if response.is_success else f"PayPal {response.status_code}"
+        failure = None if response.is_success else f"PayPal {response.status_code}{_issue(response)}"
         if not failure and action == "goodwill_refund":
             try:
                 if response.json().get("status") in ("FAILED", "CANCELLED"):

@@ -237,3 +237,12 @@ def test_unexpected_error_before_sending_reverts_the_claim(client, paypal, monke
     pid = add(client)
     assert approve(client, pid).status_code == 500
     assert not posts(paypal) and row(client, pid)["status"] == "PROPOSED"
+
+
+def test_issue_keeps_only_a_strict_paypal_error_code():
+    from api.proposals import _issue
+    ok = httpx.Response(422, json={"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "INSUFFICIENT_FUNDS"}]})
+    assert _issue(ok) == " INSUFFICIENT_FUNDS"
+    assert _issue(httpx.Response(400, json={"name": "INVALID_REQUEST"})) == " INVALID_REQUEST"
+    assert _issue(httpx.Response(400, json={"details": [{"issue": "buyer said hello@example.com"}]})) == ""
+    assert _issue(httpx.Response(500, text="<html>")) == ""
