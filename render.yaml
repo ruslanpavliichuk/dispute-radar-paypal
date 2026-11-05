@@ -12,8 +12,9 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    # shortcut: the agents run in this process, so never scale above one instance. The models need about 1 GB.
-    plan: standard
+    # shortcut: the agents run in this process, so never scale above one instance. Models alone use ~230 MB;
+    # if starter (512 MB) is killed for memory, change this to standard.
+    plan: starter
     numInstances: 1
     envVars:
       - key: DATABASE_URL
@@ -39,7 +40,7 @@ services:
     name: dispute-radar-web
     runtime: node
     rootDir: web
-    plan: standard  # the build bundles AG Grid, AG Charts, AG Studio and Bryntum and needs the memory
+    plan: starter  # if the build runs out of memory (it bundles AG Grid, AG Charts, AG Studio and Bryntum), use standard
     buildCommand: npm ci && npm run build
     startCommand: npm start
     envVars:
