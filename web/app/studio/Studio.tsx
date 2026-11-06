@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AgStudioAiModule, createAiHarness } from "ag-studio";
+import { AgStudioAiModule, createAiHarness, type AgStudioApi } from "ag-studio";
 import { AgStudio, AgStudioProvider } from "ag-studio-react";
 import Nav from "../Nav";
 import { api, getToken } from "../lib";
@@ -64,7 +64,8 @@ export default function Studio() {
        <div className="absolute inset-0">
         <AgStudioProvider licenseKey={process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE ?? ""} modules={[AgStudioAiModule]}>
           <AgStudio data={data} mode="edit"
-            ai={({ api: studio }) => createAiHarness(studio, () => ({
+            // shortcut: ag-studio 3.1.0 types this callback with the DOM-free core API; in the browser it is the full AgStudioApi. Drop the cast when the typings agree.
+            ai={({ api: studio }) => createAiHarness(studio as unknown as AgStudioApi, () => ({
               agents: [radarAgent(() => rowsRef.current)], primary: "radar",
               promptStarters: [{ label: "What is waiting?", prompt: "What is waiting for me?" }, { label: "Money at stake", prompt: "How much money is at stake?" }, { label: "Riskiest orders", prompt: "Which orders are riskiest?" }],
             }))} />
