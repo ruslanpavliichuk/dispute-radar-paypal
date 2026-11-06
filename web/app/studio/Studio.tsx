@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgStudioAiModule, createAiHarness } from "ag-studio";
 import { AgStudio, AgStudioProvider } from "ag-studio-react";
+import Nav from "../Nav";
 import { api, getToken } from "../lib";
 import { radarAgent, type Row } from "./radar";
 
@@ -56,11 +57,8 @@ export default function Studio() {
 
   return (
     <main className="flex h-screen flex-col bg-white text-neutral-900">
-      <header className="flex gap-4 border-b p-3">
-        <a className="text-blue-700 underline" href="/dashboard">Dashboard</a>
-        <a className="text-blue-700 underline" href="/evaluation">Evaluation</a>
-        <span className="text-sm text-neutral-600">Drag fields onto the canvas, or ask Radar in the assistant panel.</span>
-      </header>
+      <Nav title="Studio" />
+      <p className="border-b bg-white px-5 py-2 text-sm text-neutral-600">Drag fields onto the canvas, or ask Radar in the assistant panel.</p>
       {/* AG Studio fills its parent, so the parent needs a definite size: absolute inside a relative flex item */}
       <div className="relative min-h-0 flex-1">
        <div className="absolute inset-0">

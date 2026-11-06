@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AgCharts } from "ag-charts-react";
 import { AllCommunityModule, ModuleRegistry } from "ag-charts-community";
 import type { AgCartesianChartOptions } from "ag-charts-community";
+import Nav from "../Nav";
 import { chartTheme } from "../theme";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -35,7 +36,7 @@ function calibration(title: string, lines: { name: string; pts: Point[] }[]): Ag
 
 function Card({ options, note }: { options: AgCartesianChartOptions; note?: string }) {
   return (
-    <section className="rounded border p-3">
+    <section className="rounded-xl border border-[#d8e0ee] bg-white p-3 shadow-sm">
       <div style={{ height: 320 }}><AgCharts options={options} /></div>
       {note && <p className="mt-2 text-sm text-neutral-600">{note}</p>}
     </section>
@@ -61,12 +62,9 @@ export default function Evaluation() {
   const diff = run.brier_diff_llm_minus_model;
 
   return (
-    <main className="min-h-screen bg-white p-6 text-neutral-900">
-      <header className="mb-6 flex items-center gap-4">
-        <h1 className="text-2xl font-bold">Evaluation</h1>
-        <a className="text-blue-700 underline" href="/dashboard">Dashboard</a>
-        <a className="text-blue-700 underline" href="/studio">Studio</a>
-      </header>
+    <main className="min-h-screen bg-[#F5F7FA] text-neutral-900">
+      <Nav title="Evaluation" />
+      <div className="p-6">
       <p className="mb-6 max-w-3xl text-sm text-neutral-700">
         Every chart is drawn from the saved model cards. Dispute labels come from our own generator rules, so these
         numbers show the models recover known structure, not that they predict PayPal&apos;s decisions.
@@ -77,7 +75,7 @@ export default function Evaluation() {
         <Card options={calibration("Win chance: model vs an LLM's guess", [
           { name: "Trained model", pts: run.calibration.outcome_model }, { name: `LLM (${run.model})`, pts: run.calibration.llm }])}
           note="Below the dashed line the predictor claims more than it delivers. The LLM says about 8% where sellers win about 36%." />
-        <section className="rounded border p-3">
+        <section className="rounded-xl border border-[#d8e0ee] bg-white p-3 shadow-sm">
           <label className="mb-2 block text-sm">Risk stage{" "}
             <select value={stage} onChange={(e) => setStage(e.target.value)} className="rounded border px-1">
               {Object.keys(d.risk.thresholds).map((s) => <option key={s}>{s}</option>)}
@@ -102,6 +100,7 @@ export default function Evaluation() {
           axes: { x: { type: "number", position: "bottom", title: { text: "Chance of winning" }, ...pct }, y: { type: "number", position: "left", title: { text: "Expected value" } } },
         }}
           note={`Fee ${d.decision.fee.toFixed(0)} if a chargeback is lost, offer gives ${d.decision.offer_share_pct}% back. Fighting wins once the chance is high enough.`} />
+      </div>
       </div>
     </main>
   );

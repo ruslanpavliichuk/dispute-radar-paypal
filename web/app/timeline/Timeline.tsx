@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { api, getToken } from "../lib";
+import Nav from "../Nav";
 import { toTimeline, type Proposal } from "./model";
 
 // Bryntum reads `window` when it loads, so it is only ever loaded in the browser
@@ -28,13 +29,8 @@ export default function Timeline() {
 
   return (
     <main className="flex h-screen flex-col bg-white text-neutral-900">
-      <header className="flex flex-wrap items-center gap-4 border-b p-3">
-        <h1 className="text-lg font-bold">Deadline timeline</h1>
-        <a className="text-blue-700 underline" href="/dashboard">Dashboard</a>
-        <a className="text-blue-700 underline" href="/evaluation">Evaluation</a>
-        <a className="text-blue-700 underline" href="/studio">Studio</a>
-        <span className="text-sm text-neutral-600">Blue bar: dispute opened to response due (red once overdue). Points: what the agent did.</span>
-      </header>
+      <Nav title="Deadline timeline" />
+      <p className="border-b bg-white px-5 py-2 text-sm text-neutral-600">Blue bar: dispute opened to response due (red once overdue). Points: what the agent did.</p>
       <div className="min-h-0 flex-1">
         {!token ? <p className="p-4">Unlock the <a className="text-blue-700 underline" href="/dashboard">dashboard</a> first: the timeline reads the same proposals.</p>
           : err ? <p role="alert" className="p-4 text-red-700">{err}</p>

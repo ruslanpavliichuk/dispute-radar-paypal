@@ -154,5 +154,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Buffer
 
+- **Deadline: 2026-11-11** (set 2026-11-06). Plan: T17 on Nov 6 to 7, T18 on Nov 7 to 8, video on Nov 8 to 10, submit by Nov 10 with a day of slack.
+
 - [ ] Nov 7–11: up to 8h for missed sessions
 - Cut order if behind: T15 → Channel3 check in T11 → goodwill refund in T12. Never cut T04–T10 or T13.

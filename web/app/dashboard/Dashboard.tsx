@@ -6,6 +6,7 @@ import { AgGridReact } from "ag-grid-react";
 import { AgCharts } from "ag-charts-react";
 import { AllCommunityModule as ChartsModule, ModuleRegistry as ChartsRegistry } from "ag-charts-community";
 import { api, getToken, gbp, tokenKey } from "../lib";
+import Nav from "../Nav";
 import { brand, chartTheme, gridTheme, STATUS_COLOURS } from "../theme";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -145,17 +146,14 @@ export default function Dashboard() {
   );
 
   return (
-    <main className="min-h-screen bg-white p-6 text-neutral-900">
-      <header className="mb-6 flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-bold">Seller dashboard</h1>
-        <a className="text-blue-700 underline" href="/evaluation">Evaluation</a>
-        <a className="text-blue-700 underline" href="/studio">Studio</a>
-        <a className="text-blue-700 underline" href="/timeline">Timeline</a>
-        <form className="ml-auto flex gap-2" onSubmit={(e) => { e.preventDefault(); try { sessionStorage.setItem(tokenKey, ((new FormData(e.currentTarget).get("t") as string) ?? "").trim()); } catch {} setToken(getToken()); }}>
-          <input name="t" type="password" placeholder="Admin token" aria-label="Admin token" className="rounded border px-2 py-1" />
-          <button className="rounded bg-neutral-900 px-3 py-1 text-white">Unlock</button>
+    <main className="min-h-screen bg-[#F5F7FA] text-neutral-900">
+      <Nav title="Seller dashboard">
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); try { sessionStorage.setItem(tokenKey, ((new FormData(e.currentTarget).get("t") as string) ?? "").trim()); } catch {} setToken(getToken()); }}>
+          <input name="t" type="password" placeholder="Admin token" aria-label="Admin token" className="rounded-md border-0 px-2 py-1 text-sm text-neutral-900" />
+          <button className="rounded-md bg-[#FFC439] px-3 py-1 text-sm font-semibold text-[#001C64]">Unlock</button>
         </form>
-      </header>
+      </Nav>
+      <div className="p-6">
       {!token ? <p>Enter the admin token to see proposals.</p> : (
         <>
           {msg && !open && <p role="alert" className="mb-3 text-red-700">{msg}</p>}
@@ -182,6 +180,7 @@ export default function Dashboard() {
           </section>
         </>
       )}
+      </div>
       {open && (
         <aside role="dialog" aria-label="Proposal" className="fixed inset-y-0 right-0 w-full max-w-md overflow-y-auto border-l bg-white p-5 shadow-xl">
           <button className="float-right text-xl" aria-label="Close" onClick={() => setOpen(null)}>×</button>
@@ -200,8 +199,8 @@ export default function Dashboard() {
           {msg && <p role="alert" className="mt-2 text-sm">{msg}</p>}
           {open.error && <p className="mt-2 text-sm text-red-700">{open.error}</p>}
           <div className="mt-4 flex gap-3">
-            <button disabled={busy || open.status !== "PROPOSED"} onClick={() => decide("approve")} className="rounded bg-green-700 px-4 py-2 text-white disabled:opacity-40">Approve and send</button>
-            <button disabled={busy || open.status !== "PROPOSED"} onClick={() => decide("reject")} className="rounded border px-4 py-2 disabled:opacity-40">Reject</button>
+            <button disabled={busy || open.status !== "PROPOSED"} onClick={() => decide("approve")} className="rounded-full bg-[#0070E0] px-5 py-2 font-semibold text-white hover:bg-[#003087] disabled:opacity-40">Approve and send</button>
+            <button disabled={busy || open.status !== "PROPOSED"} onClick={() => decide("reject")} className="rounded-full border border-[#0070E0] px-5 py-2 font-semibold text-[#0070E0] disabled:opacity-40">Reject</button>
           </div>
         </aside>
       )}

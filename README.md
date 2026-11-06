@@ -186,3 +186,50 @@ Read this with care. The labels come from our own published generator rules (`ml
 4. The same shell runs `python -m scripts.simulate_tracking` and `python -m scripts.simulate_dispute` for the live demo.
 
 Checkout is protected by a per-order secret: creating an order returns a one-time `capture_secret` that the same browser must send in `X-Capture-Secret` to capture it. `/score/*` needs the admin token too. The plans in `render.yaml` (`starter` for the API and web, `basic-256mb` for Postgres) are the cheapest that can work; if the API is killed for memory or the web build runs out of memory, switch that service to `standard`.
+
+### Render deploy checklist
+
+Before you create the Blueprint:
+
+- [ ] The code, `render.yaml` and `Dockerfile` are pushed to the GitHub branch Render will watch, and CI is green.
+- [ ] You have the sandbox app's client ID and secret, a Gemini API key and the AG Studio trial key.
+- [ ] **New, Blueprint** (not New, Web Service: a manual service asks for start commands the Blueprint already has). The preview must list three resources: one database, `dispute-radar-api`, `dispute-radar-web`.
+
+Values to enter (names are exact, mind the spelling of `LICENSE`):
+
+| Service | Variable | Value |
+|---|---|---|
+| API | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | sandbox app credentials |
+| API | `GEMINI_API_KEY` | your key |
+| API | `PAYPAL_WEBHOOK_ID` | blank for now, filled after the webhook exists |
+| API | `ADMIN_TOKEN` | generated; this is the dashboard password, copy it from the **API** service, not from your local `.env` |
+| web | `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | the same public client ID (never the secret) |
+| web | `NEXT_PUBLIC_AG_STUDIO_LICENSE` | the AG Studio key |
+
+After the first deploy, in this order:
+
+- [ ] The database and both services are in the **same region**, or the private link between web and API (`API_HOSTPORT`) does not resolve.
+- [ ] API logs show `Application startup complete`; `https://<api>/health` returns `{"status":"ok"}`.
+- [ ] `https://<api>/api/evaluation` returns JSON (models loaded); `https://<api>/api/proposals` returns 401 (protected).
+- [ ] `https://<web>/` lists products (the proxy to the API works). `NEXT_PUBLIC_*` values are baked in at build time: after changing one, use **Clear build cache and deploy**.
+- [ ] Register `https://<api>/api/webhooks/paypal` in the PayPal sandbox dashboard (events `CUSTOMER.DISPUTE.*`, `PAYMENT.CAPTURE.*`), copy the webhook ID into `PAYPAL_WEBHOOK_ID`, let the API redeploy.
+- [ ] `/dashboard`: paste the API's `ADMIN_TOKEN`. Run `python -m scripts.seed_demo` in the API shell; demo proposals appear within a minute.
+- [ ] Buy something with a sandbox buyer, then `python -m scripts.simulate_tracking <ORDER_ID> accepted --day 1` in the shell prints a success line.
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Web build killed, exit 137 | not enough memory for the build | set the web service plan to `standard` |
+| API restarts or "out of memory" | the models and embedding model need more than the plan has | set the API plan to `standard` |
+| API log: `Missing required settings` | a variable above is empty | fill it in on the API service |
+| API log: SSL or connection error | `DATABASE_URL` is not the database's connection string | use the Blueprint's `fromDatabase` value; do not paste an external URL |
+| Shop shows "Could not load products" | API down, or `API_HOSTPORT` missing (different region) | check API health, then region |
+| Shop shows "NEXT_PUBLIC_PAYPAL_CLIENT_ID is not set" | variable empty or no rebuild | set it, clear build cache and deploy |
+| Dashboard says "bad admin token" | token copied from somewhere else | copy `ADMIN_TOKEN` from the API service |
+| `/studio` or `/timeline` says to unlock first | the token is kept per browser tab | unlock on `/dashboard`, then use the nav links in the same tab |
+| Webhook returns 503 | `PAYPAL_WEBHOOK_ID` unset | set it |
+| Webhook returns 400 | ID does not match the registered webhook, or a simulator event | register the real URL and use a real dispute |
+| Approve fails with `PayPal 4xx CODE` | PayPal refused the call; the code says why | read the code in the dashboard drawer |
+
+### CI/CD
+
+`.github/workflows/ci.yml` runs on every push and pull request: the Python tests (`uv run pytest`) and the web checks (`npm run lint`, `tsc`, `npm run build`). No secrets are needed. `render.yaml` sets `autoDeployTrigger: checksPass` on both services, so Render deploys a commit only after the CI checks pass; a red CI blocks the deploy. To change that, set it to `commit` (deploy on every push) or `off` (manual deploys only).
