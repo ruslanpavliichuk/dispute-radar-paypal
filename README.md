@@ -232,4 +232,4 @@ After the first deploy, in this order:
 
 ### CI/CD
 
-`.github/workflows/ci.yml` runs on every push and pull request: the Python tests (`uv run pytest`) and the web checks (`npm run lint`, `tsc`, `npm run build`). No secrets are needed. `render.yaml` sets `autoDeployTrigger: checksPass` on both services, so Render deploys a commit only after the CI checks pass; a red CI blocks the deploy. To change that, set it to `commit` (deploy on every push) or `off` (manual deploys only).
+`.github/workflows/ci.yml` runs on every push and pull request: the Python tests (`uv run pytest`) and the web checks (`npm run lint`, `npm run build`, which also type-checks). No secrets are needed. `render.yaml` sets `autoDeployTrigger: checksPass` on both services, so Render deploys a commit only after the CI checks pass; a red CI blocks the deploy. To change that, set it to `commit` (deploy on every push) or `off` (manual deploys only).
