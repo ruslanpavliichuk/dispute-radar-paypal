@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
 
-from agents.policies import decide, paypal_action
+from agents.policies import ORDER, decide, paypal_action
 from api.config import settings
 from api.db import proposals, webhook_events
 from api.disputes import DISPUTE_ID, OPEN_STATUSES, linked_order
@@ -167,8 +167,12 @@ def _propose(engine, models, event: dict, dispute: dict) -> None:
     features, defaulted, claim_type, claim_source = to_features(dispute, settings, models["claim"])
     scored = score_tabular(models["outcome"], OutcomeRequest(**features), "outcome")
     value = round(features["order_value"] * 100)
+    with engine.connect() as conn:  # a goodwill refund already paid out means a second refund (offer/accept) would double-pay
+        refunded = conn.execute(select(proposals.c.id).where(
+            proposals.c.agent == "prevention", proposals.c.subject_id == f"{order['paypal_order_id']}:goodwill_refund",
+            proposals.c.status.in_(("SENDING", "SENT")))).first() is not None
     decision = decide(scored.score, value, features["lifecycle_stage"], settings.dispute_fee_minor,
-                      settings.offer_share_pct)
+                      settings.offer_share_pct, allowed=("fight",) if refunded else ORDER)
     action = paypal_action(decision["action"], dispute.get("reason"))
     currency = dispute["dispute_amount"]["currency_code"]
     amount = {"make_offer": decision["offer_amount_minor"], "accept_claim": value}.get(action)

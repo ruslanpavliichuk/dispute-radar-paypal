@@ -270,6 +270,16 @@ async def test_run_once_makes_exactly_one_proposal(engine, models, paypal):
     assert len(proposal_rows(engine)) == 1 and paypal.dispute.call_count == 1
 
 
+async def test_no_second_refund_is_proposed_after_a_goodwill_refund(engine, models, paypal):
+    with engine.begin() as conn:  # a sent goodwill refund for the same order
+        conn.execute(insert(proposals).values(agent="prevention", subject_id="ORDER1:goodwill_refund",
+                                              action="goodwill_refund", status="SENT", created_at=datetime.now(timezone.utc)))
+    add_event(engine)
+    await run_once(engine, models)
+    [p] = [r for r in proposal_rows(engine) if r["agent"] == "response"]
+    assert p["action"] == "provide_evidence"
+
+
 async def test_existing_proposal_counts_as_success(engine, models, paypal):
     add_event(engine)
     await run_once(engine, models)
