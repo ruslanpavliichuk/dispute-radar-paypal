@@ -149,7 +149,7 @@ export default function Dashboard() {
     <main className="min-h-screen bg-[#F5F7FA] text-neutral-900">
       <Nav title="Seller dashboard">
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); try { sessionStorage.setItem(tokenKey, ((new FormData(e.currentTarget).get("t") as string) ?? "").trim()); } catch {} setToken(getToken()); }}>
-          <input name="t" type="password" placeholder="Admin token" aria-label="Admin token" className="rounded-md border-0 px-2 py-1 text-sm text-neutral-900" />
+          <input name="t" type="password" placeholder="Admin token" aria-label="Admin token" className="rounded-md border-0 bg-white px-2 py-1 text-sm text-neutral-900 placeholder:text-neutral-500" />
           <button className="rounded-md bg-[#FFC439] px-3 py-1 text-sm font-semibold text-[#001C64]">Unlock</button>
         </form>
       </Nav>

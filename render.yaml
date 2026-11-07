@@ -12,7 +12,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    autoDeployTrigger: checksPass  # deploy after the GitHub Actions CI is green, not on every push
+    autoDeployTrigger: commit  # deploy on every push to the branch; CI runs alongside as a separate check
     # shortcut: the agents run in this process, so never scale above one instance. Models alone use ~230 MB;
     # if starter (512 MB) is killed for memory, change this to standard.
     plan: starter
@@ -41,7 +41,7 @@ services:
     name: dispute-radar-web
     runtime: node
     rootDir: web
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     plan: starter  # if the build runs out of memory (it bundles AG Grid, AG Charts, AG Studio and Bryntum), use standard
     buildCommand: npm ci && npm run build
     startCommand: npm start
