@@ -7,13 +7,20 @@ export const brand = { blue: "#0070E0", navy: "#003087", sky: "#009CDE", gold: "
 export const gridTheme = themeQuartz.withParams({
   accentColor: brand.blue,
   foregroundColor: brand.ink,
-  headerBackgroundColor: brand.paper,
-  headerFontWeight: 600,
-  oddRowBackgroundColor: "#fbfcfe",
-  borderRadius: 8,
-  wrapperBorderRadius: 12,
-  spacing: 7,
-  fontSize: 13,
+  backgroundColor: "#ffffff",
+  headerBackgroundColor: "#ffffff",
+  headerTextColor: "#5C6B8A",
+  headerFontWeight: 500,
+  headerFontSize: 12,
+  oddRowBackgroundColor: "#ffffff",
+  rowHoverColor: "#F0F6FE",
+  borderColor: "#E5E9F0",
+  wrapperBorder: false,
+  wrapperBorderRadius: 0,
+  rowBorder: true,
+  columnBorder: false,
+  spacing: 9,
+  fontSize: 14,
 });
 
 export const chartTheme = {
@@ -22,6 +29,8 @@ export const chartTheme = {
   overrides: { common: { title: { fontSize: 15, fontWeight: 600, color: brand.ink } } },
 };
 
-export const STATUS_COLOURS: Record<string, string> = {
-  PROPOSED: brand.amber, SENDING: brand.blue, SENT: brand.green, FAILED: brand.red, REJECTED: "#6b7280",
+// soft chip colours: tinted background, dark text of the same hue (readable, not shouty)
+export const STATUS_CHIP: Record<string, { bg: string; fg: string }> = {
+  PROPOSED: { bg: "#FFF1D6", fg: "#7A4B00" }, SENDING: { bg: "#DCEBFC", fg: "#003087" }, SENT: { bg: "#DDF3E6", fg: "#0B5C33" },
+  FAILED: { bg: "#FBE1E3", fg: "#8F1521" }, REJECTED: { bg: "#E9ECF1", fg: "#46526B" },
 };
