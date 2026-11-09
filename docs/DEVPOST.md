@@ -23,6 +23,6 @@ PayPal Server SDK, PayPal Disputes / Payments / Tracking REST APIs, APIMatic Con
 
 ## Testing instructions (private field, do NOT commit real values)
 1. Open the demo URL. Seller pages are in the top bar: Dashboard, Timeline, Evaluation, Studio.
-2. Dashboard: unlock with the admin token: `<ADMIN_TOKEN>`.
-3. Buy something in the shop (home page) at the PayPal sandbox with this personal account: `<SANDBOX_BUYER_EMAIL>` / `<SANDBOX_BUYER_PASSWORD>`. Sandbox only, no real money.
+2. Dashboard: unlock with the admin token: `phTAFNyO0zuJsJhEuBG2/YkW73tVcNMNRz7rMl8p+7Q=`.
+3. Buy something in the shop (home page) at the PayPal sandbox with this personal account: ` sb-oruqj53753221@personal.example.com` / `Ib:/>KX7`. Sandbox only, no real money.
 4. Shipping delays and disputes are simulated with scripts, so the demo video shows that part; the dashboard, timeline, evaluation and Studio can all be explored live.
