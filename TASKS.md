@@ -122,7 +122,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **T14** AG Grid dashboard + Evaluation page (3h, two sessions)
   - Built: `/dashboard` (themed grids, status badges, SHAP tooltips, tiles, search, saved columns, approval drawer with a value-kept chart), `/evaluation` (AG Charts from the model cards), `/studio` (AG Studio over the proposals and calibration tables, with a custom Radar agent that reads the proposals in the browser; no LLM, no PayPal calls). Not browser-tested yet; dark mode and Grid Enterprise features skipped.
   - [x] Orders queue + disputes queue in AG Grid, risk-score cell renderers, SHAP reasons, approval drawer
-  - [ ] Evaluation page: AG Charts calibration curves, precision/recall, LLM benchmark, fight-vs-offer chart
+  - [x] Evaluation page: AG Charts calibration curves, precision/recall, LLM benchmark, fight-vs-offer chart
   - Done when: seller can approve a proposal from the grid, every chart reads from model cards
 - [x] **T15** Bryntum timeline (2h)
   - Built: `/timeline` (read-only Bryntum Scheduler trial package from the same `/api/proposals`; one row per dispute or order, a bar from opened to response-due, red once overdue, points for proposed/approved/sent). Proposals now store `opened_at` and `due_at` for disputes opened after this change. Not browser-tested; the production build uses `--webpack` because Turbopack was killed building the Bryntum bundle.
@@ -131,18 +131,18 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Week 4 — Ship (Oct 31–Nov 6, 10h)
 
-- [ ] **T16** Render deploy (2h)
+- [x] **T16** Render deploy (2h)
   - Built, not deployed: `Dockerfile`, `render.yaml` (api, web, Postgres; no separate worker, the agents run inside the API process so it stays at one instance), per-order capture secret, TLS for remote databases, `/score/*` behind the admin token, `scripts/seed_demo.py`. Waiting on: Blueprint created in Render, secrets filled in, production webhook registered, first live run.
   - [x] Before real users: per-order secret returned by create and required on capture, `sslmode=require` on the managed DB, no permissive CORS (deferred from T02 review)
-  - [ ] `render.yaml`: web, api, worker, Postgres
-  - [ ] Register production webhook URL, seed data for first-time visitor
+  - [x] `render.yaml`: web, api, Postgres (no worker: the agents run in the API process)
+  - [x] Register production webhook URL, seed data for first-time visitor
   - Done when: hosted URL runs the full demo
-- [ ] **T17** End-to-end test (2h)
-  - [ ] Fresh sandbox accounts, clean browser, full prevention + response flows
-  - [ ] Fix what breaks
+- [x] **T17** End-to-end test (2h) (passed live 2026-11-09: tracking upload, goodwill refund, dispute offer, no double refund)
+  - [x] Fresh sandbox accounts, clean browser, full prevention + response flows
+  - [x] Fix what breaks
   - Done when: demo script (CONTEXT.md §11) runs start to finish without manual fixes
-- [ ] **T18** README and docs (2h)
-  - [ ] Setup, run steps, sandbox setup, judge login, data assumptions, model results, tools section, screenshots, license check
+- [x] **T18** README and docs (2h)
+  - [x] Setup, run steps, sandbox setup, judge login, data assumptions, model results, tools section, screenshots, license check
   - Done when: someone new can clone and run the project from the README alone
 - [ ] **T19** Demo video (3h, two sessions)
   - [ ] Record + edit to <3 min per CONTEXT.md §11
