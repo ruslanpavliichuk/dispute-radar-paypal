@@ -106,15 +106,18 @@ def _issue(response) -> str:
     return f" {code}" if isinstance(code, str) and re.fullmatch(r"[A-Z0-9_]{1,60}", code) else ""
 
 
-def _body(action: str, row, text: str, dispute: dict) -> dict:
+def _body(action: str, row, text: str, dispute: dict, tracking: dict | None = None) -> dict:
     if action == "accept_claim":
         return {"note": text, "accept_claim_reason": "REASON_NOT_PROVIDED"}
     if action == "send_message":
         return {"message": text}
     if action == "provide_evidence":
-        # shortcut: real tracking evidence needs seller input and a multipart upload; this sends the
-        # approved text as an OTHER note. Accepted body is unverified until checked live.
-        return {"evidences": [{"evidence_type": "OTHER", "notes": text}]}
+        # PayPal rejects OTHER on not-received disputes (400 EVIDENCE_TYPE_IS_NOT_ALLOWED); proof of fulfilment with
+        # the tracking number is the type it takes. shortcut: no document uploads (they need multipart), tracking only.
+        if not tracking:
+            raise HTTPException(status_code=409, detail="no tracking number on file to send as evidence")
+        return {"evidences": [{"evidence_type": "PROOF_OF_FULFILLMENT", "notes": text, "evidence_info": {"tracking_info": [{
+            "carrier_name": "OTHER", "carrier_name_other": "Demo courier", "tracking_number": tracking["tracking_number"]}]}}]}
     if action == "make_offer":
         if row["amount_minor"] is None or not row["currency"]:
             raise HTTPException(status_code=409, detail="proposal has no offer amount")
@@ -173,8 +176,12 @@ async def _prepare_response(engine, client, proposal_id: int, row, body, back):
         await back(409, "a goodwill refund was already sent for this order")
     if not any(link.get("rel") == action for link in dispute.get("links") or []):
         await back(409, f"PayPal does not offer {action} on this dispute right now")
+    tracking = None
+    if action == "provide_evidence":
+        _, events = await run_in_threadpool(_local_facts, engine, order["paypal_order_id"])
+        tracking = next((e for e in events if e["kind"] in SHIPPING_KINDS and TRACKING_NUMBER.fullmatch(e["tracking_number"] or "")), None)
     try:
-        payload = _body(action, row, ((body and body.note) or row["draft"] or "")[:TEXT_MAX], dispute)
+        payload = _body(action, row, ((body and body.note) or row["draft"] or "")[:TEXT_MAX], dispute, tracking)
     except HTTPException as exc:
         await back(exc.status_code, exc.detail)
     return f"/v1/customer/disputes/{dispute_id}/{action.replace('_', '-')}", payload

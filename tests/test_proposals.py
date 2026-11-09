@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, update
 
 from api.config import settings
-from api.db import orders, proposals
+from api.db import orders, proposals, tracking_events
 from api.main import app
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -98,7 +98,6 @@ def test_list_and_get(client):
     ("make_offer", "make-offer", {"note": "the draft", "offer_type": "REFUND",
                                   "offer_amount": {"currency_code": "GBP", "value": "24.00"}}),
     ("send_message", "send-message", {"message": "the draft"}),
-    ("provide_evidence", "provide-evidence", {"evidences": [{"evidence_type": "OTHER", "notes": "the draft"}]}),
 ])
 def test_approve_each_action(client, paypal, action, path, body):
     pid = add(client, action)
@@ -246,3 +245,24 @@ def test_issue_keeps_only_a_strict_paypal_error_code():
     assert _issue(httpx.Response(400, json={"name": "INVALID_REQUEST"})) == " INVALID_REQUEST"
     assert _issue(httpx.Response(400, json={"details": [{"issue": "buyer said hello@example.com"}]})) == ""
     assert _issue(httpx.Response(500, text="<html>")) == ""
+
+
+def add_tracking(client, number="DEMO8811228894"):
+    with client.app.state.engine.begin() as conn:
+        conn.execute(insert(tracking_events).values(
+            paypal_order_id="ORDER3", kind="stuck_at_depot", occurred_at=T0, tracking_number=number, carrier="OTHER", created_at=T0))
+
+
+def test_evidence_is_proof_of_fulfilment_with_the_tracking_number(client, paypal):
+    add_tracking(client)
+    pid = add(client, "provide_evidence")
+    assert approve(client, pid).json()["status"] == "SENT"
+    [call] = posts(paypal)
+    assert json.loads(call.request.content) == {"evidences": [{"evidence_type": "PROOF_OF_FULFILLMENT", "notes": "the draft", "evidence_info": {
+        "tracking_info": [{"carrier_name": "OTHER", "carrier_name_other": "Demo courier", "tracking_number": "DEMO8811228894"}]}}]}
+
+
+def test_evidence_without_a_tracking_number_is_refused_before_paypal(client, paypal):
+    pid = add(client, "provide_evidence")
+    r = approve(client, pid)
+    assert r.status_code == 409 and not posts(paypal) and row(client, pid)["status"] == "PROPOSED"

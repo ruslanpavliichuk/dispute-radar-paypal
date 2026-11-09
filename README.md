@@ -1,8 +1,71 @@
 # Dispute Radar
 
-Predicts which PayPal orders will turn into disputes and acts before the buyer files one. Calibrated LightGBM models with SHAP explanations, and an evidence-backed response when a dispute still arrives. Built for the PayPal AI Hackathon 2026.
+Dispute Radar helps a PayPal seller **stop disputes before they happen and answer the ones that still arrive**. It watches orders after shipping, scores the chance each one turns into a dispute, and when a buyer does file one it scores the chance of winning and drafts a plain, evidence-based response. Every action waits for the seller's approval. Nothing reaches PayPal until they click.
 
-**Status:** early build (T01 to T13 done: webhook intake, demo shop, risk, outcome and claim models, scoring API, response agent, prevention agent, seller approval API, LLM benchmark). The dashboard (T14) is not built yet, so approvals go through the API. This README covers setup for what exists today; a full run guide lands at T18.
+Built for the PayPal AI Hackathon 2026. Sandbox only: no real money, no real buyers.
+
+- Live demo: <https://dispute-radar-web.onrender.com> (hosted on Render)
+- Licence: MIT
+
+## What it does
+
+| Stage | What happens | Who decides |
+|---|---|---|
+| **Prevention** | A shipping event arrives (`accepted`, `in_transit`, `stuck_at_depot`). A calibrated LightGBM risk model re-scores the order. Above the bar it proposes a **tracking upload** and, past the delivery estimate, a **goodwill refund** (10%). | Seller approves |
+| **Response** | A verified PayPal dispute webhook arrives. An outcome model estimates the win chance with SHAP reasons. The agent picks the best expected value of **fight, offer or accept**, and drafts the message from facts in our own database. | Seller approves |
+| **Safety** | A goodwill refund already sent means no second refund: the agent proposes evidence instead. PayPal is re-read at approval, and each approval makes one call with an idempotency key. | Code |
+
+The LLM only writes draft text. It never decides and never calls PayPal. Buyer messages are untrusted and never reach the drafting LLM.
+
+## Try it (for judges)
+
+1. Open the live demo. The shop is the home page; the seller pages are **Dashboard, Timeline, Evaluation, Studio** in the top bar.
+2. **Dashboard:** enter the admin token, given in the Devpost testing instructions (the token is not stored in this repo). You will see the proposals the agents made, the approval queue, and a side panel with the reasons, the draft and the approve or reject buttons.
+3. **Buy something** in the shop with the sandbox buyer account from the Devpost testing instructions (PayPal sandbox only; never use a real account). The order appears in the database after capture.
+4. **Shipping delays and disputes** are simulated, because there is no carrier feed and PayPal's sandbox cannot create disputes through the API. These are shell scripts (see *The agents and seller approval* below); the demo video shows the full run: buy, delay, approve the tracking upload and refund, file a dispute as the buyer, approve the response.
+5. **Evaluation** shows calibration, precision and recall, and the model-vs-LLM benchmark. **Timeline** shows each dispute from opened to response-due, and clicking a dot or bar explains it. **Studio** lets you drag fields into your own charts and ask the small "Radar" assistant what is waiting.
+
+Everything on the live demo uses the PayPal **sandbox**.
+
+## Screenshots
+
+| Dashboard | Dispute timeline |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Timeline](docs/screenshots/timeline.png) |
+| **Evaluation** | **Studio** |
+| ![Evaluation](docs/screenshots/evaluation.png) | ![Studio](docs/screenshots/studio.png) |
+
+## Model results
+
+All numbers are on held-out data, probabilities calibrated with isotonic regression. Full cards are in `ml/artifacts/*/model_card.json` and drawn live on `/evaluation`.
+
+| Model | Trained on | Test result |
+|---|---|---|
+| Dispute risk (LightGBM, SHAP) | Olist orders, 899,370 daily snapshots | PR-AUC 0.311 (base rate 0.049), Brier 0.0407 |
+| Win probability (LightGBM, SHAP) | 20,000 generated disputes (published rules) | Brier 0.183, ECE 0.017, ROC-AUC 0.783 (true-probability ceiling: Brier 0.181) |
+| Claim type (embeddings + logistic regression) | 3,000 CFPB narratives + 1,497 synthetic messages | Macro F1 0.72 on CFPB labels, 0.74 on hand-checked rows |
+| Model vs LLM guess | 300 held-out disputes | Model Brier 0.169 vs Gemini 0.207, interval +0.012 to +0.065 |
+
+## Data assumptions (read these)
+
+- **Risk model:** trained on Brazilian Olist e-commerce orders, applied to UK sandbox orders. Scores show how the system behaves, not real UK dispute rates. The model has no "stuck at depot" feature: it sees shipped, not delivered, time passing, and we assume a 14 day delivery window.
+- **Win probability:** PayPal does not publish dispute outcomes, so the labels come from **our own published generator rules** (`ml/generator_rules.yaml`). It measures calibration on known structure, not how PayPal really decides.
+- **Dispute fee** (14 GBP at chargeback) and the 30% offer share are assumptions, not PayPal figures.
+- **Tracking events** are simulated by a script standing in for a carrier feed. Disputes are filed by hand in the sandbox because the create-dispute API is limited release.
+- **Evidence** is tracking proof only. Document uploads (photos, receipts) are not implemented.
+
+## Tools and services
+
+PayPal Server SDK (orders and capture), PayPal Disputes, Payments and Tracking REST APIs over `httpx`, APIMatic Context Plugin, Gemini (default LLM; Claude or any OpenAI-compatible API by config), LightGBM, SHAP, fastembed, MLflow, FastAPI, SQLAlchemy, Postgres, Next.js 16, AG Grid, AG Charts, AG Studio, Bryntum Scheduler, Channel3 (product catalogue snapshot), GitHub Actions, Render.
+
+## Licences and third-party notes
+
+- **This project:** MIT (`LICENSE`).
+- **AG Grid Community and AG Charts Community:** MIT.
+- **AG Studio:** commercial product used under a free **evaluation licence** that expires on 19 December 2026. `/studio` needs `NEXT_PUBLIC_AG_STUDIO_LICENSE`; without a key it will not load.
+- **Bryntum Scheduler:** commercial product used through the **trial package** (`@bryntum/scheduler-trial`, aliased in `web/package.json`). It shows a trial watermark; a production deployment needs a purchased licence.
+- **Data:** Olist Brazilian E-Commerce (Kaggle, CC BY-NC-SA 4.0, non-commercial) and the CFPB consumer complaint narratives (public domain, read from a Hugging Face mirror). Neither is committed: `make data` downloads them. Check the Olist terms before any commercial use.
+- No PayPal logo or wordmark is used; the colours are only inspired by PayPal's.
 
 ## Setup
 
@@ -22,7 +85,16 @@ make dev    # uvicorn api.main:app --reload, http://127.0.0.1:8000
 make test   # pytest
 ```
 
-`GET /health` confirms the API is up.
+`GET /health` confirms the API is up. Start the database with `docker compose up -d db` first and set `DATABASE_URL` in `.env`. The web app (shop, dashboard, evaluation, timeline, Studio) runs separately:
+
+```bash
+cd web
+cp .env.local.example .env.local   # PayPal sandbox client id; AG Studio licence for /studio
+npm install
+npm run dev                        # http://localhost:3000, forwards /api/* to the API on :8000
+```
+
+The trained models are committed under `ml/artifacts/`, so `make train` is only needed to retrain.
 
 ## Risk-model data (Olist)
 
@@ -153,7 +225,7 @@ curl -H "X-Admin-Token: $ADMIN_TOKEN" localhost:8000/api/orders/attention     # 
 
 Approval makes exactly one PayPal call, after re-reading the dispute or order: it is refused if PayPal no longer offers the action, if the payment is held (for example because of a dispute) or already refunded, if the order has been delivered, or if a refund and a dispute response would pay out twice. Refund amounts are recomputed from the database at approval, never taken from the proposal or the request. Approve may carry a `{"note": "..."}` to replace the draft text (refunds only, up to 255 characters).
 
-Checked live against the sandbox: a refund offer on a dispute, a tracking upload (appears on the PayPal order), two small goodwill refunds (the capture webhook then moved the order to `PARTIALLY_REFUNDED`), and a refusal to act on a disputed order. Subscribe the dashboard webhook to `PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REFUNDED` and `.REVERSED` as well as the dispute events. Not checked live: the `send_message`, `provide_evidence` and `accept_claim` bodies sent through the API.
+Checked live against the sandbox: a refund offer on a dispute, a tracking upload (appears on the PayPal order), two small goodwill refunds (the capture webhook then moved the order to `PARTIALLY_REFUNDED`), and a refusal to act on a disputed order. Subscribe the dashboard webhook to `PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REFUNDED` and `.REVERSED` as well as the dispute events. `provide_evidence` sends proof of fulfilment with the order's tracking number (PayPal refused a plain `OTHER` note with `EVIDENCE_TYPE_IS_NOT_ALLOWED`); if the order has no tracking number the approval is refused. Not checked live: the `send_message` and `accept_claim` bodies, and the new evidence body.
 
 ## Benchmark: trained model vs an LLM's guess
 
@@ -174,7 +246,7 @@ Read this with care. The labels come from our own published generator rules (`ml
 
 ## Seller dashboard, evaluation and AG Studio
 
-`web/` has three pages next to the shop: `/dashboard` (AG Grid queues of proposals, approve or reject from a drawer, needs the `ADMIN_TOKEN`), `/evaluation` (AG Charts drawn from the saved model cards and benchmark file) `/timeline` (Bryntum Scheduler: each dispute from opened to response-due, with the agent's steps as points on the row) and `/studio` (AG Studio over the same data, with a small "Radar" agent that answers from the proposals table and cannot change anything). `/studio` needs `NEXT_PUBLIC_AG_STUDIO_LICENSE` in `web/.env.local`; it is an evaluation key, valid until 19 December 2026.
+`web/` has three pages next to the shop: `/dashboard` (AG Grid queues of proposals, approve or reject from a drawer, needs the `ADMIN_TOKEN`), `/evaluation` (AG Charts drawn from the saved model cards and benchmark file), `/timeline` (Bryntum Scheduler: each dispute from opened to response-due, with the agent's steps as points on the row) and `/studio` (AG Studio over the same data, with a small "Radar" agent that answers from the proposals table and cannot change anything). `/studio` needs `NEXT_PUBLIC_AG_STUDIO_LICENSE` in `web/.env.local`; it is an evaluation key, valid until 19 December 2026.
 
 ## Deploy on Render
 

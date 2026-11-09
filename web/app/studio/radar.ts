@@ -7,7 +7,8 @@ export type Row = {
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const money = (n: number) => `£${n.toFixed(2)}`;
-const line = (r: Row) => `${r.subject} (${r.action}, ${pct(r.score)}${r.why ? `, ${r.why}` : ""})`;
+// backticks stop the chat's markdown from eating the underscores in ids and action names
+const line = (r: Row) => `\`${r.subject}\` (\`${r.action}\`, ${pct(r.score)}${r.why ? `, ${r.why}` : ""})`;
 
 /** Answers from the proposals table only: no LLM, no PayPal call, nothing it says changes data. */
 export function answer(question: string, rows: Row[]): string {
